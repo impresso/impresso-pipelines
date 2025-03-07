@@ -3,8 +3,8 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "impresso_pipelines"
-version = "1.2.0"
+name = "impresso-pipelines"
+version = "1.0.0"
 description = "A custom package for language identification subpackage and ocr QA score calculation subpackage (imitating pipelines)"
 authors = [{ name = "Glebs Vinarskis", email = "gleb.vinarskis@gmail.com" }]
 requires-python = ">=3.7"
