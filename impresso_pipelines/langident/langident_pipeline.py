@@ -38,7 +38,7 @@ class LangIdentPipeline:
         output = self.model.predict(text, k=300 if diagnostics else 1)
         language, value = output
   
-        value = [round(num, 3) for num in value]
+        value = [round(num, 2) for num in value]
         
         score = value[0]
     
