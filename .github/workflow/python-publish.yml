@@ -17,7 +17,7 @@ jobs:
 
     environment:
       name: impresso-pipelines
-      url: https://pypi.org/p/impresso/impresso-pipelines
+      url: https://pypi.org/p/impresso-pipelines
 
     # permissions:
     #  id-token: write
@@ -43,5 +43,3 @@ jobs:
         with:
           user: __token__
           password: ${{ secrets.PYPI_TOKEN }}
-      - name: Publish docs
-        run: poetry run mkdocs gh-deploy

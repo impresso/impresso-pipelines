@@ -17,7 +17,7 @@ jobs:
 
     environment:
       name: test-impresso-pipelines
-      url: https://test.pypi.org/p/impresso/impresso-pipelines
+      url: https://test.pypi.org/p/impresso-pipelines
 
     # permissions:
     #  id-token: write
