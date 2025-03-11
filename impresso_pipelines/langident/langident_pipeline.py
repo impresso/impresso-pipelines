@@ -12,7 +12,7 @@ class LangIdentPipeline:
     A pipeline for language identification using a pre-trained floret model.
     """
     
-    def __init__(self, model_id: Optional[str] = None, repo_id: str = "impresso-project/impresso-floret-langident", revision: str = "adding_emas_pipeline"):
+    def __init__(self, model_id: Optional[str] = None, repo_id: str = "impresso-project/impresso-floret-langident", revision: str = "main"):
         """
         Initialize the LangIdentPipeline with the specified or newest model from the repository.
 
