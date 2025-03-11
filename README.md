@@ -1,3 +1,69 @@
+# Python Package: [Your Package Name]
+
+## Overview
+This repository contains a Python package designed for efficient and modular processing. Currently, it includes the following subpackages:
+
+- **Language Identification Pipeline**: Pipeline that automatically detects the language of input text and provides its corresponding probability score.
+- **OCR QA Pipeline**: Pipeline that evaluates the quality of OCR-processed text by calculating a score (0-1) representing the proportion of recognized words in the input text against a language-specific Bloom filter database.
+
+## Installation
+To install the package, use:
+```bash
+pip install impresso-pipelines
+```
+
+## Usage
+Import and use the subpackages as follows:
+```python
+from impresso-pipelines.langident import LangIdentPipeline
+from impresso-pipelines.ocrqa import OCRQAPipeline
+```
+
+## Running the Pipelines (Basic)
+
+### Language Identification Example
+```python
+# Initialize the pipeline
+lang_pipeline = LangIdentPipeline()
+
+# Example text in German
+de_text = "Ein kleiner Hund namens Max lebte in einem ruhigen Dorf. Jeden Tag rannte er durch die Straßen und spielte mit den Kindern. Eines Tages fand er einen geheimen Garten, den niemand kannte. Max entschied sich, den Garten zu erkunden und entdeckte viele schöne Blumen und Tiere. Von diesem Tag an besuchte er den Garten jeden Nachmittag."
+     
+
+# Detect language
+result = lang_pipeline(de_text)
+print(result)
+```
+**Expected Output:**
+```
+{'language': 'de', 'score': 1.0}
+```
+
+### OCR QA Example
+```python
+# Initialize the pipeline
+ocrqa_pipeline = OCRQAPipeline()
+
+# Example text extracted from OCR
+de_text = "Ein kleiner Hund namens Max lebte in einem ruhigen Dorf. Jeden Tag rannte er durch die Straßen und spielte mit den Kindern. Eines Tages fand er einen geheimen Garten, den niemand kannte. Max entschied sich, den Garten zu erkunden und entdeckte viele schöne Blumen und Tiere. Von diesem Tag an besuchte er den Garten jeden Nachmittag."
+     
+
+# Get an answer
+result = ocrqa_pipeline(de_text)
+print(result)
+```
+**Expected Output:**
+```
+{'language': 'de', 'score': 1.0}
+```
+
+## More information
+For more examples, please take a look at documentation notebooks [langident_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/langident_pipeline_demo.ipynb) and [ocrqa_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/ocrqa_pipeline_demo.ipynb).
+
+## Future Plans
+More pipelines and subpackages will be added to enhance functionality and broaden use cases. Stay tuned!
+
+
 ## About Impresso
 
 ### Impresso project
@@ -17,3 +83,5 @@ This program is provided as open source under the [GNU Affero General Public Lic
 <p align="center">
   <img src="https://github.com/impresso/impresso.github.io/blob/master/assets/images/3x1--Yellow-Impresso-Black-on-White--transparent.png?raw=true" width="350" alt="Impresso Project Logo"/>
 </p>
+
+
