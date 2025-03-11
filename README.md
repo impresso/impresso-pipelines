@@ -1,4 +1,4 @@
-# Python Package: [Your Package Name]
+# Python Package: [impresso-pipelines]
 
 ## Overview
 This repository contains a Python package designed for efficient and modular processing. Currently, it includes the following subpackages:
