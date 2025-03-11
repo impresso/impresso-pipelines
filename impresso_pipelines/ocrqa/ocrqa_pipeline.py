@@ -11,7 +11,7 @@ from huggingface_hub import hf_hub_download, list_repo_files
 from pybloomfilter import BloomFilter
 import re
 
-from impresso_pipeline.langident.langident_pipeline import LangIdentPipeline
+from impresso_pipelines.langident.langident_pipeline import LangIdentPipeline
 
 
 
