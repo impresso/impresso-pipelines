@@ -38,6 +38,7 @@ print(result)
 ```
 {'language': 'de', 'score': 1.0}
 ```
+The score roughly represents the probability of the detected language based on the input text.
 
 ### OCR QA Example
 ```python
@@ -56,6 +57,7 @@ print(result)
 ```
 {'language': 'de', 'score': 1.0}
 ```
+The score roughly represents the ratio between known and unknown words in the text in comparison to the language-specific Bloom filter database.
 
 ## More information
 For more examples, please take a look at documentation notebooks [langident_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/langident_pipeline_demo.ipynb) and [ocrqa_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/ocrqa_pipeline_demo.ipynb).
