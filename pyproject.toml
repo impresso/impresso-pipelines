@@ -12,13 +12,14 @@ numpy = "^1.24"
 huggingface_hub = { version = "*", optional = true }
 floret = { version = "*", optional = true }
 pybloomfiltermmap3 = { version = "*", optional = true }
+impresso-pipelines[langident] = { path = "./langident", optional = true }
 
 [tool.poetry.urls]
 homepage = "https://github.com/impresso/impresso-pipelines"
 
 [tool.poetry.extras]
 langident = ["huggingface_hub", "floret"]
-ocrqa = ["pybloomfiltermmap3", "huggingface_hub"]
+ocrqa = ["pybloomfiltermmap3", "huggingface_hub", "impresso-pipelines[langident]"]
 
 
 [build-system]
