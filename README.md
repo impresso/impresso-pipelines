@@ -59,6 +59,27 @@ print(result)
 ```
 Score roughly represents the ratio between known and unknown words in the text in comparison to the language-specific Bloom filter database.
 
+
+## Mallet
+
+### Diagram
+```mermaid
+graph TD;
+    A[Christmas] -->|Get money| B[Go shopping]
+    B --> C{Let me think}
+    C -->|One| D[Laptop]
+    C -->|Two| E[iPhone]
+    C -->|Three| F[Car]
+
+    F:::icon
+
+    classDef icon font-size:20px;
+    class F icon;
+
+```
+
+
+
 ## More information
 For more examples, please take a look at documentation notebooks [langident_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/langident_pipeline_demo.ipynb) and [ocrqa_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/ocrqa_pipeline_demo.ipynb).
 
