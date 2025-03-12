@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "impresso-pipelines"
-version = "0.2.7"
+version = "0.2.8"
 description = "A custom package for language identification subpackage and OCR QA score calculation subpackage (imitating pipelines)"
 authors = ["Glebs Vinarskis <gleb.vinarskis@gmail.com>"]
 readme = "README.md"
@@ -12,14 +12,14 @@ numpy = "^1.24"
 huggingface_hub = { version = "*", optional = true }
 floret = { version = "*", optional = true }
 pybloomfiltermmap3 = { version = "*", optional = true }
-impresso-pipelines[langident] = { path = "./langident", optional = true }
 
 [tool.poetry.urls]
 homepage = "https://github.com/impresso/impresso-pipelines"
 
 [tool.poetry.extras]
 langident = ["huggingface_hub", "floret"]
-ocrqa = ["pybloomfiltermmap3", "huggingface_hub", "impresso-pipelines[langident]"]
+ocrqa = ["pybloomfiltermmap3", "huggingface_hub", "floret"]
+all = ["pybloomfiltermmap3", "huggingface_hub", "floret"]
 
 
 [build-system]

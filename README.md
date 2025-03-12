@@ -9,7 +9,15 @@ This repository contains a Python package designed for efficient and modular pro
 ## Installation
 To install the package, use:
 ```bash
-pip install impresso_pipelines
+pip install impresso_pipelines[all]
+```
+If you want to install only the language identification pipeline, use:
+```bash
+pip install impresso_pipelines[langident]
+```
+If you want to install only the OCR QA pipeline, use:
+```bash
+pip install impresso_pipelines[ocrqa]
 ```
 
 ## Usage
