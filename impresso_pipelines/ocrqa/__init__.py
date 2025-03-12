@@ -1,12 +1,10 @@
-from .ocrqa_pipeline import OCRQAPipeline
-
-
 try:
     import huggingface_hub
     import floret
-    import pybloomfiltermmap3
-
-
+    import pybloomfilter  # Change this to match what's actually needed
+    
+    # Only import this after checking dependencies
+    from .ocrqa_pipeline import OCRQAPipeline
 except ImportError:
     raise ImportError(
         "The ocrqa subpackage requires additional dependencies. "
