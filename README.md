@@ -15,8 +15,8 @@ pip install impresso_pipelines
 ## Usage
 Import and use the subpackages as follows:
 ```python
-from impresso-pipelines.langident import LangIdentPipeline
-from impresso-pipelines.ocrqa import OCRQAPipeline
+from impresso_pipelines.langident import LangIdentPipeline
+from impresso_pipelines.ocrqa import OCRQAPipeline
 ```
 
 ## Running the Pipelines (Basic)
