@@ -9,7 +9,7 @@ This repository contains a Python package designed for efficient and modular pro
 ## Installation
 To install the package, use:
 ```bash
-pip install impresso-pipelines
+pip install impresso_pipelines
 ```
 
 ## Usage
