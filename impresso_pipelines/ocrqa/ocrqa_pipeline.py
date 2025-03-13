@@ -41,7 +41,6 @@ class OCRQAPipeline:
             lang_result = lang_model(text)
             self.language = lang_result["language"]
 
-        self.model_id = model_id + ".bloom" # Add .bloom extension to model_id if it was given
 
         if self.language not in self.SUPPORTED_LANGUAGES:
             raise ValueError(f"Unsupported language: {self.language}")
