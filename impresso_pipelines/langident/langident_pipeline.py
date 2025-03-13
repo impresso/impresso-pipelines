@@ -47,6 +47,8 @@ class LangIdentPipeline:
         Returns:
             dict: The identified language code, score, and optionally diagnostics and model name.
         """
+        text.replace("\n", " ") # Remove newlines
+
         output = self.model.predict(text, k=300 if diagnostics else 1)
         language, value = output
   
