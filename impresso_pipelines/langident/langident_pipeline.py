@@ -58,10 +58,10 @@ class LangIdentPipeline:
         result = {"language": language[0].replace("__label__", ""), "score": score}
 
         if diagnostics:
-            language_dict = [{"language": lang.replace("__label__", ""), "score": val} for lang, val in zip(language, value)]
-            result["diagnostics"] = {"language_dict": language_dict}
+            languages = [{"language": lang.replace("__label__", ""), "score": val} for lang, val in zip(language, value)]
+            result["diagnostics"] = {"languages": languages}
 
         if model_id:
-            result["model_name"] = self.model_name
+            result["model_id"] = self.model_name
 
         return result
