@@ -149,9 +149,9 @@ class OCRQAPipeline:
             output["diagnostics"] = {
                 "known_tokens": list(knowns),
                 "unknown_tokens": list(unknowns),
-                "bloom_filter": f"ocrqa-wp_v{self.version}-{self.language}"
+                "model_id": f"ocrqa-wp_v{self.version}-{self.language}"
             }
         elif self.model_id:
-            output["bloom_filter"] = f"ocrqa-wp_v{self.version}-{self.language}"
+            output["model_id"] = f"ocrqa-wp_v{self.version}-{self.language}"
 
         return output
