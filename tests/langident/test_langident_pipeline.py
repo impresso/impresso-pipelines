@@ -1,7 +1,7 @@
 import pytest
 from impresso_pipelines.langident.langident_pipeline import LangIdentPipeline
 
-def test_some_function():
+def test_basics():
     lang_pipeline = LangIdentPipeline()
     de_text = "Ein kleiner Hund namens Max lebte in einem ruhigen Dorf. Jeden Tag rannte er durch die Straßen und spielte mit den Kindern. Eines Tages fand er einen geheimen Garten, den niemand kannte. Max entschied sich, den Garten zu erkunden und entdeckte viele schöne Blumen und Tiere. Von diesem Tag an besuchte er den Garten jeden Nachmittag."
     result = lang_pipeline(de_text)
@@ -14,6 +14,9 @@ def test_some_function():
     assert 'language' in result.keys()
     assert 'score' in result.keys()
 
+def test_diagnostics():
+    lang_pipeline = LangIdentPipeline()
+    de_text = "Ein kleiner Hund namens Max lebte in einem ruhigen Dorf. Jeden Tag rannte er durch die Straßen und spielte mit den Kindern. Eines Tages fand er einen geheimen Garten, den niemand kannte. Max entschied sich, den Garten zu erkunden und entdeckte viele schöne Blumen und Tiere. Von diesem Tag an besuchte er den Garten jeden Nachmittag."
     result_2 = lang_pipeline(de_text, diagnostics=True)
     # assert that the pipeline returns a dictionary
     assert isinstance(result_2, dict)
@@ -24,6 +27,9 @@ def test_some_function():
     # assert that diagnostics is a dictionary
     assert isinstance(result_2['diagnostics'], dict)
 
+def test_model_id():
+    lang_pipeline = LangIdentPipeline()
+    de_text = "Ein kleiner Hund namens Max lebte in einem ruhigen Dorf. Jeden Tag rannte er durch die Straßen und spielte mit den Kindern. Eines Tages fand er einen geheimen Garten, den niemand kannte. Max entschied sich, den Garten zu erkunden und entdeckte viele schöne Blumen und Tiere. Von diesem Tag an besuchte er den Garten jeden Nachmittag."
     result_3 = lang_pipeline(de_text, diagnostics=True, model_id=True)
     # assert that the pipeline returns a dictionary
     assert isinstance(result_3, dict)
