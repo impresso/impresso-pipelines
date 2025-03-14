@@ -38,7 +38,7 @@ def test_ocrqa_pipeline_version():
     ocrqa_pipeline = OCRQAPipeline()
     de_text = "Ein kleiner Hund namens Max lebte in einem ruhigen Dorf. Jeden Tag rannte er durch die Straßen und spielte mit den Kindern. Eines Tages fand er einen geheimen Garten, den niemand kannte. Max entschied sich, den Garten zu erkunden und entdeckte viele schöne Blumen und Tiere. Von diesem Tag an besuchte er den Garten jeden Nachmittag."
 
-    result = ocrqa_pipeline(de_text, version="1.0.5", model_id=True)
+    result = ocrqa_pipeline(de_text, version="1.0.5", diagnostics=True)
 
     expected = 'ocrqa-wp_v1.0.5-de'
     
