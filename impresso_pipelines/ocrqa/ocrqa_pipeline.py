@@ -41,6 +41,7 @@ class OCRQAPipeline:
             lang_result = lang_model(text)
             self.language = lang_result["language"]
 
+
         if self.language not in self.SUPPORTED_LANGUAGES:
             raise ValueError(f"Unsupported language: {self.language}")
 
@@ -147,10 +148,10 @@ class OCRQAPipeline:
         if self.diagnostics:
             output["diagnostics"] = {
                 "known_tokens": list(knowns),
-                "unknowns_tokens": list(unknowns),
-                "bloom_filter": f"ocrqa-wp_v{self.version}-{self.language}.bloom"
+                "unknown_tokens": list(unknowns),
+                "model_id": f"ocrqa-wp_v{self.version}-{self.language}"
             }
         elif self.model_id:
-            output["bloom_filter"] = f"ocrqa-wp_v{self.version}-{self.language}.bloom"
+            output["model_id"] = f"ocrqa-wp_v{self.version}-{self.language}"
 
         return output

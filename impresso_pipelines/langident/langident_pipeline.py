@@ -47,6 +47,8 @@ class LangIdentPipeline:
         Returns:
             dict: The identified language code, score, and optionally diagnostics and model name.
         """
+        text = text.replace("\n", " ") # Remove newlines
+
         output = self.model.predict(text, k=300 if diagnostics else 1)
         language, value = output
   
@@ -58,10 +60,10 @@ class LangIdentPipeline:
         result = {"language": language[0].replace("__label__", ""), "score": score}
 
         if diagnostics:
-            language_dict = [{"language": lang.replace("__label__", ""), "score": val} for lang, val in zip(language, value)]
-            result["diagnostics"] = {"language_dict": language_dict}
+            languages = [{"language": lang.replace("__label__", ""), "score": val} for lang, val in zip(language, value)]
+            result["diagnostics"] = {"languages": languages}
 
         if model_id:
-            result["model_name"] = self.model_name
+            result["model_id"] = self.model_name
 
         return result
