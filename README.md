@@ -86,7 +86,7 @@ flowchart TD
         n6["Produce <br>JSON output"]
   end
     A["(1) Input text (str)"] --> n1["(2) Langident"]
-    n1 -- de/fr/lb --> n2["(3) Tokenizer<br>Post__<br>Lemmanizer<br>(SPACY)"]
+    n1 -- de/fr/lb --> n2["(3) Tokenizer<br>POStagging<br>Lemmanizer<br>(SPACY)"]
     n2 --> n3
     n3 --> n5
     s2 --> n6
