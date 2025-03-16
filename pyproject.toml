@@ -20,6 +20,7 @@ homepage = "https://github.com/impresso/impresso-pipelines"
 [tool.poetry.extras]
 langident = ["huggingface_hub", "floret"]
 ocrqa = ["pybloomfiltermmap3", "huggingface_hub", "floret", "transformers"]
+mallet = ["huggingface_hub", "floret", "spacy"]
 all = ["pybloomfiltermmap3", "huggingface_hub", "floret", "transformers"]
 
 [tool.poetry.dev-dependencies]
