@@ -1,13 +1,13 @@
 from impresso_pipelines.langident.langident_pipeline import LangIdentPipeline
 from impresso_pipelines.mallet.SPACY import SPACY
 from impresso_pipelines.mallet.config import SUPPORTED_LANGUAGES  # Import config
-# from impresso_pipelines.mallet.mallet_vectorizer import MalletVectorizer 
+from impresso_pipelines.mallet.mallet_vectorizer import MalletVectorizer 
 
 class MalletPipeline:
     def __init__(self):
         pass
 
-    def __call__(self, text, language=None):
+    def __call__(self, text, language=None, output_file="output.mallet"):
         # PART 1: Language Identification
         self.language = language
         if self.language is None:
@@ -20,10 +20,11 @@ class MalletPipeline:
         lemma_text = self.SPACY(text)
 
         # PART 3: Vectorization using Mallet
-        # vectorized_mallet_text = self.vectorizer_mallet(lemma_text)
+        self.vectorizer_mallet(lemma_text, output_file)
 
+        print(f"Vectorized output saved to {output_file}")
 
-        return lemma_text  # Returns clean lemmatized text without punctuation
+        return "hey world"  # Returns clean lemmatized text without punctuation
 
     def language_detection(self, text):
         lang_model = LangIdentPipeline()
@@ -41,8 +42,8 @@ class MalletPipeline:
         return nlp(text, model_id)
 
 
-    # def vectorizer_mallet(self, text):
-    #     # Load the Mallet pipeline
-    #     pipe_file = "impresso_pipelines/mallet/mallet_pipes/"+"tm-"+self.language+"-all-v2.0.pipe"
-    #     mallet = MalletVectorizer(pipe_file)
-    #     return mallet(text)
+    def vectorizer_mallet(self, text, output_file):
+        # Load the Mallet pipeline
+        pipe_file = "impresso_pipelines/mallet/mallet_pipes/"+"tm-"+self.language+"-all-v2.0.pipe"
+        mallet = MalletVectorizer(pipe_file, output_file)
+        mallet(text)
