@@ -112,6 +112,8 @@ Once the language is identified, the text undergoes several preprocessing steps:
 - **Part-of-Speech (POS) Tagging**: Words are assigned grammatical categories (e.g., noun, verb, adjective).
 - **Lemmatization**: Words are reduced to their base form (e.g., *running* → *run*).
 
+Output is a list of lemmatized tokens: `['ein', 'klein', 'Hund', 'namens', 'Max', 'leben', 'in', 'ein', 'ruhig', 'Dorf', ...]`
+
 ### 4. Mallet Vectorizers
 The processed text is converted into a format suitable for MALLET topic modeling. This step likely includes **text vectorization**, where words are transformed into numerical representations.
 
