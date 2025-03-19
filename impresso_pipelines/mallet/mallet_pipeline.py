@@ -1,7 +1,7 @@
 from impresso_pipelines.langident.langident_pipeline import LangIdentPipeline
 from impresso_pipelines.mallet.SPACY import SPACY
 from impresso_pipelines.mallet.config import SUPPORTED_LANGUAGES  # Import config
-from impresso_pipelines.mallet.mallet_vectorizer import MalletVectorizer 
+from impresso_pipelines.mallet.mallet_vectorizer_changed import MalletVectorizer 
 
 class MalletPipeline:
     def __init__(self):
