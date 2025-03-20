@@ -79,59 +79,10 @@ class LanguageInferencer:
         Returns a dictionary of document_id -> topic distributions.
         """
 
-        # Create a temporary copy of the pipe file because Mallet modifies it in this
-        # version of mallet. If run in parallel, the pipe file will be corrupted.
-        with tempfile.NamedTemporaryFile(delete=True) as temp_pipe_file:
-            shutil.copyfile(self.pipe_file, temp_pipe_file.name)
-            temp_pipe_file_path = temp_pipe_file.name
-
-            # Vectorize the input file and write to a temporary file
-            vectorizer = MalletVectorizer(
-                language=self.language,
-                pipe_file=temp_pipe_file_path,
-                keep_tmp_file=self.keep_tmp_files,
-            )
-            mallet_file = vectorizer.run_csv2vectors(csv_file)
-
-            topics_file = mallet_file + ".doctopics"
-
-            arguments = [
-                "--input",
-                mallet_file,
-                "--inferencer",
-                self.inferencer_file,
-                "--output-doc-topics",
-                topics_file,
-                "--random-seed",
-                str(self.random_seed),
-            ]
-
-            logging.info("Calling mallet InferTopics: %s", arguments)
-
-            self.inferencer.main(arguments)
-            logging.debug("InferTopics call finished.")
-
-            if (
-                logging.getLogger().getEffectiveLevel() != logging.DEBUG
-                and delete_mallet_file_after
-                and not self.keep_tmp_files
-            ):
-                os.remove(mallet_file)
-                logging.debug("Deleting temporary mallet input file: %s", mallet_file)
-
-        return topics_file
-
-    def run_csv2topics(
-        self, mallet_file: str, delete_mallet_file_after: bool = True
-    ) -> str:
-        """
-        Perform topic inference on a pre-vectorized Mallet file.
-        Returns the path to the output topics file.
-        """
+        # Retrieve the Mallet file directly from the repository
+        mallet_file = os.path.join(os.path.dirname(__file__), "output.mallet")
         if not os.path.exists(mallet_file):
-            raise FileNotFoundError(
-                f"Mallet file not found: {mallet_file}. Ensure the file exists before running inference."
-            )
+            raise FileNotFoundError(f"Mallet file not found: {mallet_file}")
 
         topics_file = mallet_file + ".doctopics"
 
@@ -151,19 +102,11 @@ class LanguageInferencer:
         self.inferencer.main(arguments)
         logging.debug("InferTopics call finished.")
 
-        # Check if the .doctopics file was created
-        if not os.path.exists(topics_file):
-            raise FileNotFoundError(
-                f"Expected output file not found: {topics_file}. "
-                f"Check if the Mallet InferTopics command executed correctly."
-            )
-
         if (
             logging.getLogger().getEffectiveLevel() != logging.DEBUG
             and delete_mallet_file_after
             and not self.keep_tmp_files
         ):
-            os.remove(mallet_file)
-            logging.debug("Deleting temporary mallet input file: %s", mallet_file)
+            logging.debug("Skipping deletion of mallet file: %s", mallet_file)
 
         return topics_file

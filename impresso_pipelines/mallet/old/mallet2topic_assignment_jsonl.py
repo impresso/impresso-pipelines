@@ -41,7 +41,7 @@ import jsonschema
 from jsonschema import Draft7Validator
 from typing import Generator, List, Dict, Any, Optional
 from smart_open import open
-import impresso_pipelines.mallet.s3_to_local_stamps
+from .s3_to_local_stamps import get_timestamp
 
 
 SCHEMA_BASE_URI = "https://impresso.github.io/impresso-schemas/json/topic_model/"
@@ -155,7 +155,7 @@ class Mallet2TopicAssignment:
         self.topic_id_format = (
             f"{self.topic_model}_tp{{t:0{self.padding_length}d}}_{self.lang}"
         )
-        self.last_timestamp = impresso_pipelines.mallet.s3_to_local_stamps.get_timestamp()
+        self.last_timestamp = get_timestamp()
 
     def validate_options(self) -> None:
         if self.min_p <= 0 or self.min_p >= 1:

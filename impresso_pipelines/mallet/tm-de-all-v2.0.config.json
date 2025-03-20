@@ -1,0 +1,8 @@
+{
+  "uposFilter": ["NOUN", "PROPN"],
+  "topic_count": 100,
+  "language": "de",
+  "model_id": "tm-de-all-v2.0",
+  "lowercase_token": false,
+  "min_lemmas": 8
+}

@@ -24,7 +24,7 @@ class MalletPipeline:
 
         print(f"Vectorized output saved to {output_file}")
 
-        return "hey world"  # Returns clean lemmatized text without punctuation
+        return lemma_text # Returns clean lemmatized text without punctuation
 
     def language_detection(self, text):
         lang_model = LangIdentPipeline()

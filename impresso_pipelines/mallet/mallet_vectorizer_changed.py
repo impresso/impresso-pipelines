@@ -1,9 +1,9 @@
 import jpype
 import jpype.imports
 import os
-import sys
-import tempfile  # Add this import
-import logging  # Add this import
+import logging
+import tempfile
+from typing import List
 
 # Start JVM if not already running
 if not jpype.isJVMStarted():
@@ -13,11 +13,8 @@ if not jpype.isJVMStarted():
     # Start JVM with Mallet's classpath
     jpype.startJVM(jpype.getDefaultJVMPath(), f"-Djava.class.path={classpath}")
 
-# Now, import Mallet Java classes
+# Import Mallet Java class
 from cc.mallet.classify.tui import Csv2Vectors  # Import after JVM starts
-
-
-
 
 class MalletVectorizer:
     """
@@ -30,43 +27,36 @@ class MalletVectorizer:
         self.output_file = os.path.join(os.path.dirname(__file__), output_file)  # Save in the same folder
         self.keep_tmp_file = keep_tmp_file
 
-    def __call__(self, lemmatized_words: list) -> None:
+    def __call__(self, lemmatized_words: List[str]) -> str:
         """
-        Processes a given list of lemmatized words, vectorizing it using Mallet and saves the output to a file.
+        Processes a given list of lemmatized words, vectorizing it using Mallet and returns the output file path.
 
         Args:
             lemmatized_words (list): The input list of lemmatized words to be vectorized.
+        
+        Returns:
+            str: Path to the generated .mallet file.
         """
-        text = " ".join(lemmatized_words)  # Join the list into a single string
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".csv", mode="w", encoding="utf-8") as temp_file:
-            input_file = temp_file.name
-            temp_file.write(f"id,text\n1,{text}")  # Mallet expects a CSV-like format
-
-        temp_output_file = input_file + ".mallet"
+        # Create a temporary input file for Mallet
+        temp_input_file = "temp_input.csv"
+        with open(temp_input_file, "w", encoding="utf-8") as temp_file:
+            temp_file.write("id\tclass\ttext\n")
+            temp_file.write(f"1\tdummy\t{' '.join(lemmatized_words)}\n")
 
         # Arguments for Csv2Vectors
         arguments = [
-            "--input",
-            input_file,
-            "--output",
-            temp_output_file,
+            "--input", temp_input_file,
+            "--output", self.output_file,
             "--keep-sequence",
-            "--use-pipe-from",
-            self.pipe_file,
+            "--use-pipe-from", self.pipe_file,
         ]
 
-        logging.info(f"Calling Mallet Csv2Vector with arguments: {arguments}")
+        logging.info("Calling Mallet Csv2Vectors with arguments: %s", arguments)
         self.vectorizer.main(arguments)
-        logging.debug("Csv2Vector processing completed.")
-
-        # Read the generated Mallet file and save its content to the specified output file
-        with open(temp_output_file, "rb") as mallet_file:  # Change mode to 'rb'
-            mallet_output = mallet_file.read().decode('utf-8', errors='ignore')  # Decode with 'ignore' errors
-
-        with open(self.output_file, "w", encoding="utf-8") as output_file:
-            output_file.write(mallet_output)
+        logging.debug("Csv2Vectors call finished.")
 
         if not self.keep_tmp_file:
-            os.remove(input_file)
-            os.remove(temp_output_file)
-            logging.info(f"Temporary files deleted: {input_file}, {temp_output_file}")
+            os.remove(temp_input_file)
+            logging.info("Deleted temporary input file: %s", temp_input_file)
+
+        return self.output_file

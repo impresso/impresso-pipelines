@@ -7,3 +7,7 @@ text = "Die Katzen spielten fröhlich im Garten, während die Vögel sangen."
 mallet = MalletPipeline()
 output = mallet(text)
 print(output)
+
+
+
+# monolingual_lda_inferencer

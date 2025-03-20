@@ -16,7 +16,7 @@ import json
 from typing import Generator, Tuple, List, Set, Dict
 import logging
 import csv
-import impresso_pipelines.mallet.s3_to_local_stamps
+from impresso_pipelines.mallet.s3_to_local_stamps import get_s3_client
 from abc import ABC, abstractmethod
 from smart_open import open
 
@@ -145,7 +145,7 @@ class ImpressoLinguisticProcessingJsonlInputReader(InputReader):
         log.warning("LOG Reading documents from %s", self.input_file)
 
         if self.input_file.startswith("s3://"):
-            tranport_params = {"client": s3_to_local_stamps.get_s3_client()}
+            tranport_params = {"client": get_s3_client()}
         else:
             tranport_params = {}
         with open(
