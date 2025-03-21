@@ -59,16 +59,20 @@ class MalletPipeline:
 
 
     def mallet_inferencer(self):
+        lang = self.language  # adjusting calling based on language
+
         args = argparse.Namespace(
             input="impresso_pipelines/mallet/output.mallet",
             input_format="jsonl",
-            languages=["de"],
+            languages=[lang],
             output="output.jsonl",
             output_format="jsonl",
-            de_inferencer="impresso_pipelines/mallet/mallet_pipes/tm-de-all-v2.0.inferencer",
-            de_pipe="impresso_pipelines/mallet/mallet_pipes/tm-de-all-v2.0.pipe",
-            de_model_id="tm-de-all-v2.0",
-            de_topic_count=100,
+            **{
+                f"{lang}_inferencer": f"impresso_pipelines/mallet/mallet_pipes/tm-{lang}-all-v2.0.inferencer",
+                f"{lang}_pipe": f"impresso_pipelines/mallet/mallet_pipes/tm-{lang}-all-v2.0.pipe",
+                f"{lang}_model_id": f"tm-{lang}-all-v2.0",
+                f"{lang}_topic_count": 2,
+            },
             min_p=0.02,
             keep_tmp_files=False,
             include_lid_path=False,
@@ -83,7 +87,7 @@ class MalletPipeline:
             quiet=False,
             output_path_base=None,
             language_file=None,
-            impresso_model_id=None,  # Add this default value
+            impresso_model_id=None,
         )
 
         inferencer = MalletTopicInferencer(args)
