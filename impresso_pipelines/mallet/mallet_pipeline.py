@@ -71,9 +71,9 @@ class MalletPipeline:
                 f"{lang}_inferencer": f"impresso_pipelines/mallet/mallet_pipes/tm-{lang}-all-v2.0.inferencer",
                 f"{lang}_pipe": f"impresso_pipelines/mallet/mallet_pipes/tm-{lang}-all-v2.0.pipe",
                 f"{lang}_model_id": f"tm-{lang}-all-v2.0",
-                f"{lang}_topic_count": 2,
+                f"{lang}_topic_count": 20
             },
-            min_p=0.02,
+            min_p=0.01,
             keep_tmp_files=False,
             include_lid_path=False,
             inferencer_random_seed=42,
