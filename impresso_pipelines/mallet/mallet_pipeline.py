@@ -12,7 +12,8 @@ class MalletPipeline:
     def __init__(self):
         pass
 
-    def __call__(self, text, language=None, output_file="output.mallet"):
+    def __call__(self, text, language=None, output_file="tmp_output.mallet"):
+        self.output_file = output_file
         # PART 1: Language Identification
         self.language = language
         if self.language is None:
@@ -68,7 +69,7 @@ class MalletPipeline:
         lang = self.language  # adjusting calling based on language
 
         args = argparse.Namespace(
-            input="impresso_pipelines/mallet/output.mallet",
+            input="impresso_pipelines/mallet/" + self.output_file,
             input_format="jsonl",
             languages=[lang],
             output="impresso_pipelines/mallet/tmp_output.jsonl",
