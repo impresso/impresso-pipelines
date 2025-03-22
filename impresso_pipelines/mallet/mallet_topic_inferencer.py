@@ -790,7 +790,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output",
         help="Path to final output file. (%(default)s)",
-        default="output.jsonl",
+        default="impresso_pipelines/mallet/tmp_output.jsonl",
     )
     parser.add_argument(
         "--output-format",
@@ -1021,7 +1021,7 @@ if __name__ == "__main__":
             setattr(args, f"{lang}_lemmatization", lemmatization_path)
     if args.output_path_base:
         args.keep_tmp_files = True
-        if args.output == "output.jsonl":  # the default should be overwritten
+        if args.output == "impresso_pipelines/mallet/tmp_output.jsonl":  # the default should be overwritten
             if args.output_format == "jsonl":
                 args.output = args.output_path_base + ".jsonl"
             elif args.output_format == "csv":

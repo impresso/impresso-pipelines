@@ -4,6 +4,8 @@ from impresso_pipelines.mallet.config import SUPPORTED_LANGUAGES  # Import confi
 from impresso_pipelines.mallet.mallet_vectorizer_changed import MalletVectorizer 
 from impresso_pipelines.mallet.mallet_topic_inferencer import MalletTopicInferencer
 import argparse
+import json
+import os
 
 
 class MalletPipeline:
@@ -29,11 +31,15 @@ class MalletPipeline:
         self.mallet_inferencer()
 
 
-        
+        # PART 5: Return the JSON output
+        output = self.json_output(filepath="impresso_pipelines/mallet/tmp_output.jsonl")
+
+
+        print(f"Lemma list: {lemma_text}")
         
                 
 
-        return lemma_text # Returns clean lemmatized text without punctuation
+        return output # Returns clean lemmatized text without punctuation
 
     def language_detection(self, text):
         lang_model = LangIdentPipeline()
@@ -65,7 +71,7 @@ class MalletPipeline:
             input="impresso_pipelines/mallet/output.mallet",
             input_format="jsonl",
             languages=[lang],
-            output="output.jsonl",
+            output="impresso_pipelines/mallet/tmp_output.jsonl",
             output_format="jsonl",
             **{
                 f"{lang}_inferencer": f"impresso_pipelines/mallet/mallet_pipes/tm-{lang}-all-v2.0.inferencer",
@@ -73,7 +79,7 @@ class MalletPipeline:
                 f"{lang}_model_id": f"tm-{lang}-all-v2.0",
                 f"{lang}_topic_count": 20
             },
-            min_p=0.01,
+            min_p=0.02,
             keep_tmp_files=False,
             include_lid_path=False,
             inferencer_random_seed=42,
@@ -93,3 +99,29 @@ class MalletPipeline:
         inferencer = MalletTopicInferencer(args)
 
         inferencer.run()
+
+    
+    def json_output(self, filepath):
+        """
+        Reads a JSONL file and returns a list of parsed JSON objects.
+
+        Parameters:
+            filepath (str): Path to the .jsonl file.
+
+        Returns:
+            List[dict]: A list of dictionaries, one per JSONL line.
+        """
+        data = []
+        with open(filepath, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:  # skip empty lines
+                    try:
+                        data.append(json.loads(line))
+                    except json.JSONDecodeError as e:
+                        print(f"Skipping invalid line: {line}\nError: {e}")
+
+        # delete the file after reading
+        os.remove(filepath)
+
+        return data
