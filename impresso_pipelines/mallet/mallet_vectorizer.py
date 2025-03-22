@@ -17,65 +17,62 @@ Attributes:
 
 import os
 import logging
-from typing import Optional
+from typing import Optional, List
 
 
 class MalletVectorizer:
     """
-    Handles the vectorization of multiple documents into a format usable by Mallet
-    using the pipe file from the model.
+    Handles the vectorization of a lemmatized list using Mallet.
     """
 
-    def __init__(
-        self, language: str, pipe_file: str, keep_tmp_file: bool = False
-    ) -> None:
-
-        # noinspection PyUnresolvedReferences
-        from cc.mallet.classify.tui import Csv2Vectors  # type: ignore # Import after JVM is started
+    def __init__(self, pipe_file: str, keep_tmp_file: bool = False) -> None:
+        # Import after JVM is started
+        from cc.mallet.classify.tui import Csv2Vectors  # type: ignore
 
         self.vectorizer = Csv2Vectors()
-
         self.pipe_file = pipe_file
-        self.language = language
         self.keep_tmp_file = keep_tmp_file
 
     def run_csv2vectors(
         self,
-        input_file: str,
+        lemma_list: List[str],
         output_file: Optional[str] = None,
     ) -> str:
         """
-        Run Csv2Vectors to vectorize the input file.
-
-        Simple java-internal command line interface to the Csv2Vectors class in Mallet.
+        Vectorize the lemmatized list using Mallet.
 
         Args:
-            input_file: Path to the csv input file to be vectorized.
+            lemma_list: List of lemmatized words.
             output_file: Path where the output .mallet file should be saved.
+
+        Returns:
+            Path to the generated .mallet file.
         """
-
         if not output_file:
-            output_file = input_file + ".mallet"
+            output_file = "output.mallet"
 
-        # Arguments for Csv2Vectors java main class
+        # Create a temporary input file for Mallet
+        with open("temp_input.csv", "w", encoding="utf-8") as temp_file:
+            temp_file.write("id\tclass\ttext\n")
+            temp_file.write(f"1\tdummy\t{' '.join(lemma_list)}\n")
+
+        # Arguments for Csv2Vectors
         arguments = [
             "--input",
-            input_file,
+            "temp_input.csv",
             "--output",
             output_file,
-            "--keep-sequence",  # Keep sequence for feature extraction
-            # "--encoding",
-            # "UTF-8",
+            "--keep-sequence",
             "--use-pipe-from",
             self.pipe_file,
         ]
 
-        logging.info("Calling mallet Csv2Vector: %s", arguments)
+        logging.info("Calling Mallet Csv2Vectors with arguments: %s", arguments)
         self.vectorizer.main(arguments)
+        logging.debug("Csv2Vectors call finished.")
 
-        logging.debug("Csv2Vector call finished.")
         if not self.keep_tmp_file:
-            os.remove(input_file)
-            logging.info("Deleting temporary file: %s", input_file)
+            os.remove("temp_input.csv")
+            logging.info("Deleted temporary input file: temp_input.csv")
 
         return output_file

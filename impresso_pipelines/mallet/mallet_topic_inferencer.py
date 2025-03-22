@@ -53,6 +53,7 @@ from impresso_pipelines.mallet.input_reader import (
 
 
 log = logging.getLogger(__name__)
+log.setLevel(logging.ERROR)  # Suppress warnings and unnecessary logs
 load_dotenv()
 
 
@@ -203,10 +204,8 @@ class MalletTopicInferencer:
                 ]
 
             jpype.startJVM(classpath=classpath)
-            log.info(f"JVM started successfully with classpath {classpath}.")
-            self.jvm_started = True  # Mark that this instance started the JVM
         else:
-            log.warning("JVM already running.")
+            pass  # Suppress "JVM already running" warning
 
     def run(self) -> None:
         """Main execution method. Either processing an input file or waiting for

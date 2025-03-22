@@ -21,7 +21,7 @@ from abc import ABC, abstractmethod
 from smart_open import open
 
 log = logging.getLogger(__name__)
-print(log)
+log.setLevel(logging.ERROR)  # Suppress warnings and unnecessary logs
 
 
 class InputReader(ABC):
