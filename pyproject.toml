@@ -9,10 +9,14 @@ readme = "README.md"
 python = ">=3.9,<3.13"
 cython = "*"
 numpy = "^1.24"
-huggingface_hub = { version = "*", optional = true }
 floret = { version = "*", optional = true }
 pybloomfiltermmap3 = { version = "*", optional = true }
 transformers = { version = "*", optional = true }
+jpype1 = "^1.4.1"  # For Java integration
+smart_open = "^6.3.0"  # For handling S3 and other file streams
+boto3 = "^1.28.0"  # For S3 interactions
+python-dotenv = "^1.0.0"  # For environment variable management
+spacy = "^3.6.0"  # For text lemmatization
 
 [tool.poetry.urls]
 homepage = "https://github.com/impresso/impresso-pipelines"
@@ -20,7 +24,15 @@ homepage = "https://github.com/impresso/impresso-pipelines"
 [tool.poetry.extras]
 langident = ["huggingface_hub", "floret"]
 ocrqa = ["pybloomfiltermmap3", "huggingface_hub", "floret", "transformers"]
-mallet = ["huggingface_hub", "floret", "spacy"]
+mallet = [
+    "huggingface_hub",
+    "floret",
+    "spacy",
+    "jpype1",  # For Java integration
+    "smart_open",  # For handling S3 and other file streams
+    "boto3",  # For S3 interactions
+    "python-dotenv"  # For environment variable management
+]
 all = ["pybloomfiltermmap3", "huggingface_hub", "floret", "transformers"]
 
 [tool.poetry.dev-dependencies]
