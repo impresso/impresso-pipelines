@@ -6,10 +6,14 @@ from impresso_pipelines.mallet.mallet_topic_inferencer import MalletTopicInferen
 import argparse
 import json
 import os
+from huggingface_hub import hf_hub_url, hf_hub_download
+import tempfile  # Add import for temporary directory
+
 
 
 class MalletPipeline:
     def __init__(self):
+        self.temp_dir = tempfile.mkdtemp(prefix="mallet_models_")  # Create temp folder for models
         pass
 
     def __call__(self, text, language=None, output_file="tmp_output.mallet"):
@@ -21,6 +25,9 @@ class MalletPipeline:
 
         if self.language not in SUPPORTED_LANGUAGES:
             raise ValueError(f"Unsupported language: {self.language}. Supported languages are: {SUPPORTED_LANGUAGES.keys()}")
+        
+        # Part 1.5: Download required files from huggingface model hub
+        self.download_required_files()
 
         # PART 2: Lemmatization using SpaCy
         lemma_text = self.SPACY(text)
@@ -28,6 +35,7 @@ class MalletPipeline:
         # PART 3: Vectorization using Mallet
         self.vectorizer_mallet(lemma_text, output_file)
 
+        
         # PART 4: Mallet inferencer and JSONification
         self.mallet_inferencer()
 
@@ -57,16 +65,71 @@ class MalletPipeline:
         nlp = SPACY()
         return nlp(text, model_id)
 
+    def download_required_files(self):
+        """
+        Downloads the required files for the specified language from the Hugging Face repository.
+        """
+        repo_id = "impresso-project/mallet-topic-inferencer"
+        base_path = "models/tm"
+        files_to_download = [
+            f"{base_path}/tm-{self.language}-all-v2.0.pipe",
+            f"{base_path}/tm-{self.language}-all-v2.0.inferencer",
+            f"{base_path}/tm-{self.language}-all-v2.0.vocab.lemmatization.tsv.gz",
+        ]
+
+        for file_path in files_to_download:
+            try:
+                file_name = os.path.basename(file_path)
+                local_path = os.path.join(self.temp_dir, file_path)  # Include subdirectory in path
+                print(f"Attempting to download {file_path} to {local_path}...")  # Debug log
+
+                # Download the file
+                downloaded_path = hf_hub_download(
+                    repo_id=repo_id,
+                    filename=file_path,
+                    local_dir=self.temp_dir,
+                    local_dir_use_symlinks=False
+                )
+
+                # Verify the downloaded file path
+                if not os.path.exists(downloaded_path):
+                    raise FileNotFoundError(f"File {downloaded_path} was not downloaded correctly.")
+                if not os.access(downloaded_path, os.R_OK):
+                    raise PermissionError(f"File {downloaded_path} is not readable.")
+
+                print(f"Successfully downloaded {file_name} to {downloaded_path}")
+            except Exception as e:
+                print(f"Error downloading {file_path}: {e}")  # Log the error
+                raise RuntimeError(f"Failed to download {file_path} from {repo_id}: {e}")
 
     def vectorizer_mallet(self, text, output_file):
         # Load the Mallet pipeline
-        pipe_file = "impresso_pipelines/mallet/mallet_pipes/"+"tm-"+self.language+"-all-v2.0.pipe"
+        pipe_file = os.path.join(self.temp_dir, "models/tm", f"tm-{self.language}-all-v2.0.pipe")  # Adjust path
+        
+        # Verify the pipe file exists and is readable
+        if not os.path.exists(pipe_file):
+            raise FileNotFoundError(f"Pipe file not found: {pipe_file}")
+        if not os.access(pipe_file, os.R_OK):
+            raise PermissionError(f"Pipe file is not readable: {pipe_file}")
+        
         mallet = MalletVectorizer(pipe_file, output_file)
         mallet(text)
 
-
     def mallet_inferencer(self):
         lang = self.language  # adjusting calling based on language
+
+        inferencer_pipe = os.path.join(self.temp_dir, "models/tm", f"tm-{lang}-all-v2.0.pipe")  # Adjust path
+        inferencer_file = os.path.join(self.temp_dir, "models/tm", f"tm-{lang}-all-v2.0.inferencer")  # Adjust path
+
+        # Verify the inferencer files exist and are readable
+        if not os.path.exists(inferencer_pipe):
+            raise FileNotFoundError(f"Inferencer pipe file not found: {inferencer_pipe}")
+        if not os.access(inferencer_pipe, os.R_OK):
+            raise PermissionError(f"Inferencer pipe file is not readable: {inferencer_pipe}")
+        if not os.path.exists(inferencer_file):
+            raise FileNotFoundError(f"Inferencer file not found: {inferencer_file}")
+        if not os.access(inferencer_file, os.R_OK):
+            raise PermissionError(f"Inferencer file is not readable: {inferencer_file}")
 
         args = argparse.Namespace(
             input="impresso_pipelines/mallet/" + self.output_file,
@@ -75,8 +138,8 @@ class MalletPipeline:
             output="impresso_pipelines/mallet/tmp_output.jsonl",
             output_format="jsonl",
             **{
-                f"{lang}_inferencer": f"impresso_pipelines/mallet/mallet_pipes/tm-{lang}-all-v2.0.inferencer",
-                f"{lang}_pipe": f"impresso_pipelines/mallet/mallet_pipes/tm-{lang}-all-v2.0.pipe",
+                f"{lang}_inferencer": inferencer_file,
+                f"{lang}_pipe": inferencer_pipe,
                 f"{lang}_model_id": f"tm-{lang}-all-v2.0",
                 f"{lang}_topic_count": 20
             },
@@ -98,7 +161,6 @@ class MalletPipeline:
         )
 
         inferencer = MalletTopicInferencer(args)
-
         inferencer.run()
 
     
