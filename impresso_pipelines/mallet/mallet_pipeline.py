@@ -6,8 +6,9 @@ from impresso_pipelines.mallet.mallet_topic_inferencer import MalletTopicInferen
 import argparse
 import json
 import os
-from huggingface_hub import hf_hub_url, hf_hub_download
+from huggingface_hub import hf_hub_url, hf_hub_download, list_repo_files  # Add list_repo_files import
 import tempfile  # Add import for temporary directory
+import shutil  # Add import for removing directories
 
 
 
@@ -17,38 +18,44 @@ class MalletPipeline:
         pass
 
     def __call__(self, text, language=None, output_file="tmp_output.mallet"):
-        self.output_file = output_file
-        # PART 1: Language Identification
-        self.language = language
-        if self.language is None:
-            self.language_detection(text)
+        try:
+            self.output_file = output_file
+            # PART 1: Language Identification
+            self.language = language
+            if self.language is None:
+                self.language_detection(text)
 
-        if self.language not in SUPPORTED_LANGUAGES:
-            raise ValueError(f"Unsupported language: {self.language}. Supported languages are: {SUPPORTED_LANGUAGES.keys()}")
-        
-        # Part 1.5: Download required files from huggingface model hub
-        self.download_required_files()
+            if self.language not in SUPPORTED_LANGUAGES:
+                raise ValueError(f"Unsupported language: {self.language}. Supported languages are: {SUPPORTED_LANGUAGES.keys()}")
+            
+            # Part 1.5: Download required files from huggingface model hub
+            self.download_required_files()
 
-        # PART 2: Lemmatization using SpaCy
-        lemma_text = self.SPACY(text)
+            # PART 2: Lemmatization using SpaCy
+            lemma_text = self.SPACY(text)
 
-        # PART 3: Vectorization using Mallet
-        self.vectorizer_mallet(lemma_text, output_file)
+            # PART 3: Vectorization using Mallet
+            self.vectorizer_mallet(lemma_text, output_file)
 
-        
-        # PART 4: Mallet inferencer and JSONification
-        self.mallet_inferencer()
-
-
-        # PART 5: Return the JSON output
-        output = self.json_output(filepath="impresso_pipelines/mallet/tmp_output.jsonl")
+            
+            # PART 4: Mallet inferencer and JSONification
+            self.mallet_inferencer()
 
 
-        print(f"Lemma list: {lemma_text}")
-        
-                
+            # PART 5: Return the JSON output
+            output = self.json_output(filepath="impresso_pipelines/mallet/tmp_output.jsonl")
 
-        return output # Returns clean lemmatized text without punctuation
+
+            print(f"Lemma list: {lemma_text}")
+            
+                    
+
+            return output  # Returns clean lemmatized text without punctuation
+        finally:
+            # Remove the temporary directory after execution
+            if os.path.exists(self.temp_dir):
+                shutil.rmtree(self.temp_dir)
+                print(f"Temporary directory {self.temp_dir} has been removed.")
 
     def language_detection(self, text):
         lang_model = LangIdentPipeline()
@@ -68,13 +75,30 @@ class MalletPipeline:
     def download_required_files(self):
         """
         Downloads the required files for the specified language from the Hugging Face repository.
+        Checks for the newest version available for the specified language.
         """
         repo_id = "impresso-project/mallet-topic-inferencer"
         base_path = "models/tm"
+        
+        # Fetch all files in the repository
+        try:
+            repo_files = list_repo_files(repo_id)
+        except Exception as e:
+            raise RuntimeError(f"Failed to list files in repository {repo_id}: {e}")
+
+        # Filter files for the specified language and find the newest version
+        language_files = [f for f in repo_files if f.startswith(f"{base_path}/tm-{self.language}-all-v")]
+
+        if not language_files:
+            raise FileNotFoundError(f"No files found for language {self.language} in repository {repo_id}")
+
+        # Extract version numbers and sort to find the newest version
+        language_files.sort(key=lambda x: int(x.split('-v')[-1].split('.')[0]), reverse=True)
+        newest_version_files = [f for f in language_files if f.split('-v')[1].split('.')[0] == language_files[0].split('-v')[1].split('.')[0]]
+
+        # Define the required files for the newest version
         files_to_download = [
-            f"{base_path}/tm-{self.language}-all-v2.0.pipe",
-            f"{base_path}/tm-{self.language}-all-v2.0.inferencer",
-            f"{base_path}/tm-{self.language}-all-v2.0.vocab.lemmatization.tsv.gz",
+            f for f in newest_version_files if any(ext in f for ext in [".pipe", ".inferencer", ".vocab.lemmatization.tsv.gz"])
         ]
 
         for file_path in files_to_download:
