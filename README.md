@@ -86,7 +86,7 @@ flowchart TD
         n6["Produce <br>JSON output"]
   end
     A["(1) Input text (str)"] --> n1["(2) Langident"]
-    n1 -- de/fr/lb --> n2["(3) Tokenizer<br>POStagging<br>Lemmanizer<br>(SPACY)"]
+    n1 -- de/fr/lb --> n2["(3) Tokenizer<br>Post__<br>Lemmanizer<br>(SPACY)"]
     n2 --> n3
     n3 --> n5
     s2 --> n6
@@ -100,30 +100,13 @@ flowchart TD
 
 
 ```
-### 1. Input Text (str)
-The pipeline starts with a text input in string format. This could be any textual data that needs to be analyzed.
 
-### 2. Langident (Language Identification)
-The system uses a language identification tool to detect the language of the input text. Based on the output, the text is classified as German (`de`), French (`fr`), or Luxembourgish (`lb`).
-
-### 3. Tokenizer, POS Tagging, and Lemmatization (Using SpaCy)
-Once the language is identified, the text undergoes several preprocessing steps:
-- **Tokenization**: The text is split into individual words.
-- **Part-of-Speech (POS) Tagging**: Words are assigned grammatical categories (e.g., noun, verb, adjective).
-- **Lemmatization**: Words are reduced to their base form (e.g., *running* → *run*).
-
-Output is a list of lemmatized tokens: `['ein', 'klein', 'Hund', 'namens', 'Max', 'leben', 'in', 'ein', 'ruhig', 'Dorf', ...]`
-
-### 4. Mallet Vectorizers
-The processed text is converted into a format suitable for MALLET topic modeling. This step likely includes **text vectorization**, where words are transformed into numerical representations.
-
-### 5. Mallet Inferences
-MALLET applies **topic modeling**, typically using **Latent Dirichlet Allocation (LDA)** or another probabilistic model. The system infers **topics** from the text.
-
-### 6. JSONification
-The topic modeling results are formatted into **JSON output**. This output is likely structured with **topic distributions, keywords, and document-topic probabilities**, making it easier to use for downstream applications.
-
-
+1) *Input text (str)*: The input text is passed to the pipeline.
+2) *Langident*: Allows only de/fr/lb, otherwise "Unsupported language". 
+3) *Tokenizer, Pos____, Lemmanizer (SPACY)*: Tokenizes the input text, removes stop words, and lemmatizes the tokens.
+4) *Mallet vectorizers*: Java runtime
+5) *Mallet inferences*: Java runtime
+6) *JSONafication*:
 
 
 
