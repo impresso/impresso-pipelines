@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "impresso-pipelines"
-version = "0.4.3.3"
+version = "0.4.3.4"
 description = "A custom package for language identification subpackage and OCR QA score calculation subpackage (imitating pipelines)"
 authors = ["Glebs Vinarskis <gleb.vinarskis@gmail.com>"]
 readme = "README.md"
@@ -13,10 +13,10 @@ floret = { version = "*", optional = true }
 pybloomfiltermmap3 = { version = "*", optional = true }
 transformers = { version = "*", optional = true }
 huggingface_hub = { version = "*", optional = true }
-jpype1 = "^1.4.1"  # For Java integration
-smart_open = "^6.3.0"  # For handling S3 and other file streams
-boto3 = "^1.28.0"  # For S3 interactions
-python-dotenv = "^1.0.0"  # For environment variable management
+jpype1 = { version = "^1.4.1", optional = true }  # For Java integration
+smart_open = { version = "^6.3.0", optional = true }  # For handling S3 and other file streams
+boto3 = { version = "^1.28.0", optional = true }  # For S3 interactions
+python-dotenv = { version = "^1.0.0", optional = true }  # For environment variable management
 
 
 [tool.poetry.urls]
