@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "impresso-pipelines"
-version = "0.4.3.8"
+version = "0.4.3.21"
 description = "A custom package for language identification subpackage and OCR QA score calculation subpackage (imitating pipelines)"
 authors = ["Glebs Vinarskis <gleb.vinarskis@gmail.com>"]
 readme = "README.md"
