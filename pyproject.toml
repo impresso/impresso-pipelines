@@ -1,12 +1,12 @@
 [tool.poetry]
 name = "impresso-pipelines"
-version = "0.4.3.25"
+version = "0.4.3.26"
 description = "A custom package for language identification subpackage and OCR QA score calculation subpackage (imitating pipelines)"
 authors = ["Glebs Vinarskis <gleb.vinarskis@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.9,<3.13"
+python = ">=3.11.11,<3.12.4"
 cython = "*"
 numpy = "2.2.4"
 huggingface_hub = { version = "*", optional = true }
