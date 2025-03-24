@@ -15,11 +15,11 @@ import shutil  # Add import for removing directories
 class MalletPipeline:
     def __init__(self):
         self.temp_dir = tempfile.mkdtemp(prefix="mallet_models_")  # Create temp folder for models
+        self.output_file = os.path.join(self.temp_dir, "tmp_output.mallet")  # Ensure output file is in temp_dir
         pass
 
-    def __call__(self, text, language=None, output_file="tmp_output.mallet"):
+    def __call__(self, text, language=None):
         try:
-            self.output_file = output_file
             # PART 1: Language Identification
             self.language = language
             if self.language is None:
@@ -35,21 +35,15 @@ class MalletPipeline:
             lemma_text = self.SPACY(text)
 
             # PART 3: Vectorization using Mallet
-            self.vectorizer_mallet(lemma_text, output_file)
+            self.vectorizer_mallet(lemma_text)
 
-            
             # PART 4: Mallet inferencer and JSONification
             self.mallet_inferencer()
 
-
             # PART 5: Return the JSON output
-            output = self.json_output(filepath="impresso_pipelines/mallet/tmp_output.jsonl")
-
+            output = self.json_output(filepath=os.path.join(self.temp_dir, "tmp_output.jsonl"))
 
             print(f"Lemma list: {lemma_text}")
-            
-                    
-
             return output  # Returns clean lemmatized text without punctuation
         finally:
             # Remove the temporary directory after execution
@@ -126,7 +120,7 @@ class MalletPipeline:
                 print(f"Error downloading {file_path}: {e}")  # Log the error
                 raise RuntimeError(f"Failed to download {file_path} from {repo_id}: {e}")
 
-    def vectorizer_mallet(self, text, output_file):
+    def vectorizer_mallet(self, text):
         # Load the Mallet pipeline
         pipe_file = os.path.join(self.temp_dir, "models/tm", f"tm-{self.language}-all-v2.0.pipe")  # Adjust path
         
@@ -136,7 +130,7 @@ class MalletPipeline:
         if not os.access(pipe_file, os.R_OK):
             raise PermissionError(f"Pipe file is not readable: {pipe_file}")
         
-        mallet = MalletVectorizer(pipe_file, output_file)
+        mallet = MalletVectorizer(pipe_file, self.output_file)
         mallet(text)
 
     def mallet_inferencer(self):
@@ -156,10 +150,10 @@ class MalletPipeline:
             raise PermissionError(f"Inferencer file is not readable: {inferencer_file}")
 
         args = argparse.Namespace(
-            input="impresso_pipelines/mallet/" + self.output_file,
+            input=self.output_file,  # Use the temp directory for input
             input_format="jsonl",
             languages=[lang],
-            output="impresso_pipelines/mallet/tmp_output.jsonl",
+            output=os.path.join(self.temp_dir, "tmp_output.jsonl"),  # Output in temp directory
             output_format="jsonl",
             **{
                 f"{lang}_inferencer": inferencer_file,
