@@ -1,0 +1,46 @@
+#file: noinspection YAMLSchemaValidation
+# This workflow will upload a Python Package using Twine when a release is created
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python#publishing-to-package-registries
+name: Upload Test Python Package
+
+on:
+  release:
+    types: [prereleased]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    environment:
+      name: test-impresso-pipelines
+      url: https://test.pypi.org/p/impresso-pipelines
+
+    # permissions:
+    #  id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: abatilo/actions-poetry@v2
+        with:
+          poetry-version: 1.5
+      - name: Install dependencies
+        run: |
+          poetry install
+      - name: Build package
+        run: poetry build
+      - name: Publish test package
+        uses: pypa/gh-action-pypi-publish@release/v1
+        # pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
+
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          user: __token__
+          password: ${{ secrets.TEST_PYPI_TOKEN }}
