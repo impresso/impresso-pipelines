@@ -1294,12 +1294,12 @@ socks = ["pysocks (>=1.5.6,!=1.5.7,<2.0)"]
 zstd = ["zstandard (>=0.18.0)"]
 
 [extras]
-all = ["floret", "pybloomfiltermmap3", "transformers"]
-langident = ["floret"]
-mallet = ["boto3", "floret", "jpype1", "python-dotenv", "smart_open"]
-ocrqa = ["floret", "pybloomfiltermmap3", "transformers"]
+all = ["floret", "huggingface_hub", "pybloomfiltermmap3", "transformers"]
+langident = ["floret", "huggingface_hub"]
+mallet = ["boto3", "floret", "huggingface_hub", "jpype1", "python-dotenv", "smart_open"]
+ocrqa = ["floret", "huggingface_hub", "pybloomfiltermmap3", "transformers"]
 
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.13"
-content-hash = "9fe4d435f5be9562a3432b8ce8c0e3e703a5411907fed28dd18dc22e8fd5c4ec"
+content-hash = "52eae8d7ee14c2825128218360cb59ae0bc15255edd218fb436cf80aed113447"

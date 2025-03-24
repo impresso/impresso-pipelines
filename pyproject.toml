@@ -8,10 +8,11 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = ">=3.9,<3.13"
 cython = "*"
-numpy = "1.26.4"
+numpy = "^1.24"
 floret = { version = "*", optional = true }
 pybloomfiltermmap3 = { version = "*", optional = true }
 transformers = { version = "*", optional = true }
+huggingface_hub = { version = "*", optional = true }
 jpype1 = "^1.4.1"  # For Java integration
 smart_open = "^6.3.0"  # For handling S3 and other file streams
 boto3 = "^1.28.0"  # For S3 interactions
