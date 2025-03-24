@@ -2260,4 +2260,4 @@ ocrqa = ["floret", "pybloomfiltermmap3", "transformers"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.13"
-content-hash = "cde40da8e7efc74560e33e69ea08e738cc04dbfc1826060ba66e7bdd783e5630"
+content-hash = "45cbf80f9a8f365c04a2d55ccd6c5936b4d34be1f907405b1558e6b18b00f18e"
