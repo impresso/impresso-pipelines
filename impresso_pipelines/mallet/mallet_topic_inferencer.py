@@ -37,8 +37,10 @@ import tempfile
 
 from typing import List, Dict, Generator, Optional, Set, Iterable, Any
 
-import impresso_pipelines.mallet.s3_to_local_stamps
-import impresso_pipelines.mallet.mallet2topic_assignment_jsonl as m2taj
+import impresso_pipelines.mallet.language_inferencer as language_inferencer
+# Remove direct imports to avoid circular dependencies
+# import impresso_pipelines.mallet.s3_to_local_stamps
+# import impresso_pipelines.mallet.mallet2topic_assignment_jsonl as m2taj
 from smart_open import open
 
 
@@ -114,8 +116,9 @@ class MalletTopicInferencer:
         self.initialize()
 
         # Initialize S3 client if input or language file is in S3
+        from impresso_pipelines.mallet.s3_to_local_stamps import get_s3_client, s3_file_exists  # Lazy import
         self.S3_CLIENT = (
-            impresso_pipelines.mallet.s3_to_local_stamps.get_s3_client()
+            get_s3_client()
             if self.args.input.startswith("s3://")
             or self.args.s3_output_path
             else None
@@ -123,7 +126,7 @@ class MalletTopicInferencer:
 
         # Check if the output file already exists in S3 and avoid lengthy processing
         if self.args.quit_if_s3_output_exists and (s3out := self.args.s3_output_path):
-            if impresso_pipelines.mallet.s3_to_local_stamps.s3_file_exists(self.S3_CLIENT, s3out):
+            if s3_file_exists(self.S3_CLIENT, s3out):
                 log.warning(
                     "%s exists. Exiting without processing %s", s3out, self.args.input
                 )
@@ -215,7 +218,8 @@ class MalletTopicInferencer:
             self.process_input_file()
 
         if self.args.s3_output_path and not self.args.s3_output_dry_run:
-            impresso_pipelines.mallet.s3_to_local_stamps.upload_file_to_s3(
+            from impresso_pipelines.mallet.s3_to_local_stamps import upload_file_to_s3  # Lazy import
+            upload_file_to_s3(
                 self.S3_CLIENT, self.args.output, self.args.s3_output_path
             )
         for key, value in sorted(self.stats.items()):
@@ -342,6 +346,8 @@ class MalletTopicInferencer:
         return language_lemmatizations
 
     def init_ma2ta_converters(self, args: argparse.Namespace) -> Dict[str, Generator]:
+        from impresso_pipelines.mallet.mallet2topic_assignment_jsonl import Mallet2TopicAssignment  # Lazy import
+
         """
         Build a mapping of languages to their respective Mallet2TopicAssignment
         converters.
@@ -388,7 +394,7 @@ class MalletTopicInferencer:
                 ma2ta_args.extend(["--git-version", self.args.git_version])
             if self.args.impresso_model_id:
                 ma2ta_args.extend(["--impresso-model-id", self.args.impresso_model_id])
-            ma2ta_converters[language] = m2taj.Mallet2TopicAssignment.main(
+            ma2ta_converters[language] = Mallet2TopicAssignment.main(
                 ma2ta_args
             ).run()
         return ma2ta_converters
@@ -610,12 +616,13 @@ class MalletTopicInferencer:
                 doctopics_file,  # input comes last!
             ]
             if self.args.lingproc_run_id:
-                args.extend(["--lingproc-run_id", self.args.lingproc_run_id])
+                args.extend(["--lingproc_run_id", self.args.lingproc_run_id])
             if self.args.git_version:
                 args.extend(["--git-version", self.args.git_version])
             if self.args.impresso_model_id:
                 args.extend(["--impresso-model-id", self.args.impresso_model_id])
-            m2ta_converters[lang] = m2taj.Mallet2TopicAssignment.main(args).run()
+            from impresso_pipelines.mallet.mallet2topic_assignment_jsonl import Mallet2TopicAssignment  # Lazy import
+            m2ta_converters[lang] = Mallet2TopicAssignment.main(args).run()
 
         with open(self.args.output, "w", encoding="utf-8") as out_f:
             for lang, m2ta_converter in m2ta_converters.items():
@@ -938,7 +945,8 @@ if __name__ == "__main__":
 
     # Check if the output file already exists on S3 and avoid any processing
     if args.quit_if_s3_output_exists and (s3out := args.s3_output_path):
-        if impresso_pipelines.mallet.s3_to_local_stamps.s3_file_exists(impresso_pipelines.mallet.s3_to_local_stamps.get_s3_client(), s3out):
+        from impresso_pipelines.mallet.s3_to_local_stamps import s3_file_exists, get_s3_client  # Lazy import
+        if s3_file_exists(get_s3_client(), s3out):
             logging.warning(
                 "S3 file exists: %s Exiting without processing %s", s3out, args.input
             )

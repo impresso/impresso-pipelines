@@ -1,7 +1,4 @@
 from impresso_pipelines.langident.langident_pipeline import LangIdentPipeline
-from impresso_pipelines.mallet.SPACY import SPACY
-from impresso_pipelines.mallet.config import SUPPORTED_LANGUAGES  # Import config
-from impresso_pipelines.mallet.mallet_vectorizer_changed import MalletVectorizer 
 from impresso_pipelines.mallet.mallet_topic_inferencer import MalletTopicInferencer
 import argparse
 import json
@@ -25,6 +22,7 @@ class MalletPipeline:
             if self.language is None:
                 self.language_detection(text)
 
+            from impresso_pipelines.mallet.config import SUPPORTED_LANGUAGES  # Lazy import
             if self.language not in SUPPORTED_LANGUAGES:
                 raise ValueError(f"Unsupported language: {self.language}. Supported languages are: {SUPPORTED_LANGUAGES.keys()}")
             
@@ -65,6 +63,9 @@ class MalletPipeline:
     
     def SPACY(self, text):
         """Uses the appropriate SpaCy model based on language"""
+        from impresso_pipelines.mallet.SPACY import SPACY  # Lazy import
+        from impresso_pipelines.mallet.config import SUPPORTED_LANGUAGES  # Lazy import
+
         model_id = SUPPORTED_LANGUAGES[self.language]
         if not model_id:
             raise ValueError(f"No SpaCy model available for {self.language}")
@@ -127,6 +128,8 @@ class MalletPipeline:
                 raise RuntimeError(f"Failed to download {file_path} from {repo_id}: {e}")
 
     def vectorizer_mallet(self, text, output_file):
+        from impresso_pipelines.mallet.mallet_vectorizer_changed import MalletVectorizer  # Lazy import
+
         # Load the Mallet pipeline
         pipe_file = os.path.join(self.temp_dir, "models/tm", f"tm-{self.language}-all-v2.0.pipe")  # Adjust path
         
@@ -150,7 +153,7 @@ class MalletPipeline:
             raise FileNotFoundError(f"Inferencer pipe file not found: {inferencer_pipe}")
         if not os.access(inferencer_pipe, os.R_OK):
             raise PermissionError(f"Inferencer pipe file is not readable: {inferencer_pipe}")
-        if not os.path.exists(inferencer_file):
+        if not os.exists(inferencer_file):
             raise FileNotFoundError(f"Inferencer file not found: {inferencer_file}")
         if not os.access(inferencer_file, os.R_OK):
             raise PermissionError(f"Inferencer file is not readable: {inferencer_file}")

@@ -7,8 +7,7 @@ try:
     import boto3
     import dotenv
 
-    
-    # Only import this after checking dependencies
+
     from .mallet_pipeline import MalletPipeline
 except ImportError:
     raise ImportError(
