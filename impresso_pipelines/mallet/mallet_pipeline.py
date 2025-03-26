@@ -12,11 +12,20 @@ import shutil  # Add import for removing directories
 class MalletPipeline:
     def __init__(self):
         self.temp_dir = tempfile.mkdtemp(prefix="mallet_models_")  # Create temp folder for models
+        self.temp_output_file = None  # Placeholder for temporary output file
         pass
 
-    def __call__(self, text, language=None, output_file="tmp_output.mallet"):
+    def __call__(self, text, language=None, output_file=None):
         try:
-            self.output_file = output_file
+            # Use a temporary file if no output file is provided
+            if output_file is None:
+                self.temp_output_file = tempfile.NamedTemporaryFile(
+                    prefix="tmp_output_", suffix=".mallet", dir=self.temp_dir, delete=False
+                )
+                self.output_file = self.temp_output_file.name
+            else:
+                self.output_file = output_file
+
             # PART 1: Language Identification
             self.language = language
             if self.language is None:
@@ -25,7 +34,7 @@ class MalletPipeline:
             from impresso_pipelines.mallet.config import SUPPORTED_LANGUAGES  # Lazy import
             if self.language not in SUPPORTED_LANGUAGES:
                 raise ValueError(f"Unsupported language: {self.language}. Supported languages are: {SUPPORTED_LANGUAGES.keys()}")
-            
+
             # Part 1.5: Download required files from huggingface model hub
             self.download_required_files()
 
@@ -33,24 +42,22 @@ class MalletPipeline:
             lemma_text = self.SPACY(text)
 
             # PART 3: Vectorization using Mallet
-            self.vectorizer_mallet(lemma_text, output_file)
+            self.vectorizer_mallet(lemma_text, self.output_file)
 
-            
             # PART 4: Mallet inferencer and JSONification
             self.mallet_inferencer()
 
-
             # PART 5: Return the JSON output
-            output = self.json_output(filepath="impresso_pipelines/mallet/tmp_output.jsonl")
-
+            output = self.json_output(filepath=os.path.join(self.temp_dir, "tmp_output.jsonl"))
 
             print(f"Lemma list: {lemma_text}")
-            
-                    
 
             return output  # Returns clean lemmatized text without punctuation
         finally:
-            # Remove the temporary directory after execution
+            # Remove the temporary directory and files after execution
+            if self.temp_output_file and os.path.exists(self.temp_output_file.name):
+                os.remove(self.temp_output_file.name)
+                print(f"Temporary output file {self.temp_output_file.name} has been removed.")
             if os.path.exists(self.temp_dir):
                 shutil.rmtree(self.temp_dir)
                 print(f"Temporary directory {self.temp_dir} has been removed.")
@@ -159,10 +166,10 @@ class MalletPipeline:
             raise PermissionError(f"Inferencer file is not readable: {inferencer_file}")
 
         args = argparse.Namespace(
-            input="impresso_pipelines/mallet/" + self.output_file,
+            input=self.output_file,  # Use the dynamically created output file
             input_format="jsonl",
             languages=[lang],
-            output="impresso_pipelines/mallet/tmp_output.jsonl",
+            output=os.path.join(self.temp_dir, "tmp_output.jsonl"),
             output_format="jsonl",
             **{
                 f"{lang}_inferencer": inferencer_file,

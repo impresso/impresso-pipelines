@@ -38,14 +38,16 @@ class MalletVectorizer:
             str: Path to the generated .mallet file.
         """
         # Create a temporary input file for Mallet
-        temp_input_file = "temp_input.csv"
-        with open(temp_input_file, "w", encoding="utf-8") as temp_file:
+        temp_input_file = tempfile.NamedTemporaryFile(
+            prefix="temp_input_", suffix=".csv", dir=os.path.dirname(self.output_file), delete=False
+        )
+        with open(temp_input_file.name, "w", encoding="utf-8") as temp_file:
             temp_file.write("id\tclass\ttext\n")
             temp_file.write(f"1\tdummy\t{' '.join(lemmatized_words)}\n")
 
         # Arguments for Csv2Vectors
         arguments = [
-            "--input", temp_input_file,
+            "--input", temp_input_file.name,
             "--output", self.output_file,
             "--keep-sequence",
             "--use-pipe-from", self.pipe_file,
@@ -56,7 +58,7 @@ class MalletVectorizer:
         logging.debug("Csv2Vectors call finished.")
 
         if not self.keep_tmp_file:
-            os.remove(temp_input_file)
-            logging.info("Deleted temporary input file: %s", temp_input_file)
+            os.remove(temp_input_file.name)
+            logging.info("Deleted temporary input file: %s", temp_input_file.name)
 
         return self.output_file
