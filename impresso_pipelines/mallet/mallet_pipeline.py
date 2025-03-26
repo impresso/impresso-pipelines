@@ -153,7 +153,7 @@ class MalletPipeline:
             raise FileNotFoundError(f"Inferencer pipe file not found: {inferencer_pipe}")
         if not os.access(inferencer_pipe, os.R_OK):
             raise PermissionError(f"Inferencer pipe file is not readable: {inferencer_pipe}")
-        if not os.exists(inferencer_file):
+        if not os.path.exists(inferencer_file):
             raise FileNotFoundError(f"Inferencer file not found: {inferencer_file}")
         if not os.access(inferencer_file, os.R_OK):
             raise PermissionError(f"Inferencer file is not readable: {inferencer_file}")
