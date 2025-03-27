@@ -50,7 +50,6 @@ class MalletPipeline:
             # PART 5: Return the JSON output
             output = self.json_output(filepath=os.path.join(self.temp_dir, "tmp_output.jsonl"))
 
-            print(f"Lemma list: {lemma_text}")
 
             return output  # Returns clean lemmatized text without punctuation
         finally:
