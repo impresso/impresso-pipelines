@@ -7,10 +7,14 @@ from huggingface_hub import hf_hub_url, hf_hub_download, list_repo_files  # Add 
 import tempfile  # Add import for temporary directory
 import shutil  # Add import for removing directories
 
+# Import setup_mallet to ensure Mallet is configured
+from impresso_pipelines.mallet.mallet_vectorizer_changed import setup_mallet
 
 
 class MalletPipeline:
     def __init__(self):
+        # Ensure Mallet is set up
+        setup_mallet()
         self.temp_dir = tempfile.mkdtemp(prefix="mallet_models_")  # Create temp folder for models
         self.temp_output_file = None  # Placeholder for temporary output file
         pass
