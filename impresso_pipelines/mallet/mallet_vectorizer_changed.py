@@ -10,10 +10,11 @@ from urllib.request import urlretrieve
 # Ensure Mallet JAR files are available
 def setup_mallet():
     mallet_dir = "/opt/mallet"
+    mallet_class_dir = os.path.join(mallet_dir, "class")
     mallet_deps_jar = os.path.join(mallet_dir, "lib/mallet-deps.jar")
     mallet_jar = os.path.join(mallet_dir, "lib/mallet.jar")
 
-    if not os.path.exists(mallet_deps_jar) or not os.path.exists(mallet_jar):
+    if not os.path.exists(mallet_deps_jar) or not os.path.exists(mallet_jar) or not os.path.exists(mallet_class_dir):
         os.makedirs(os.path.join(mallet_dir, "lib"), exist_ok=True)
         logging.info("Downloading Mallet JAR files...")
         try:
@@ -43,8 +44,9 @@ def setup_mallet():
 if not jpype.isJVMStarted():
     try:
         mallet_path = setup_mallet()
-        classpath = f"{mallet_path}/class:{mallet_path}/lib/mallet-deps.jar"
+        classpath = f"{mallet_path}/class:{mallet_path}/lib/mallet-deps.jar:{mallet_path}/lib/mallet.jar"
         jpype.startJVM(jpype.getDefaultJVMPath(), f"-Djava.class.path={classpath}")
+        logging.info("JVM started with classpath: %s", classpath)
     except Exception as e:
         raise RuntimeError(f"Failed to start JVM with Mallet classpath: {e}")
 
