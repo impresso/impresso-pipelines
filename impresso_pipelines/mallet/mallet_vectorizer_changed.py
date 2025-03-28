@@ -3,18 +3,56 @@ import jpype.imports
 import os
 import logging
 import tempfile
+import subprocess
 from typing import List
+from urllib.request import urlretrieve
+
+# Ensure Mallet JAR files are available
+def setup_mallet():
+    mallet_dir = "/opt/mallet"
+    mallet_deps_jar = os.path.join(mallet_dir, "lib/mallet-deps.jar")
+    mallet_jar = os.path.join(mallet_dir, "lib/mallet.jar")
+
+    if not os.path.exists(mallet_deps_jar) or not os.path.exists(mallet_jar):
+        os.makedirs(os.path.join(mallet_dir, "lib"), exist_ok=True)
+        logging.info("Downloading Mallet JAR files...")
+        try:
+            urlretrieve(
+                "https://github.com/mimno/Mallet/archive/refs/heads/master.zip",
+                "/tmp/mallet.zip",
+            )
+            subprocess.run(
+                ["unzip", "-o", "/tmp/mallet.zip", "-d", "/tmp"], check=True
+            )
+            subprocess.run(
+                ["cp", "-r", "/tmp/Mallet-master/class", mallet_dir], check=True
+            )
+            subprocess.run(
+                ["cp", "/tmp/Mallet-master/lib/mallet-deps.jar", mallet_deps_jar], check=True
+            )
+            subprocess.run(
+                ["cp", "/tmp/Mallet-master/lib/mallet.jar", mallet_jar], check=True
+            )
+            logging.info("Mallet JAR files downloaded and configured.")
+        except Exception as e:
+            raise RuntimeError(f"Failed to download or configure Mallet JAR files: {e}")
+
+    return mallet_dir
 
 # Start JVM if not already running
 if not jpype.isJVMStarted():
-    mallet_path = "/opt/mallet"  # Adjust this path if necessary
-    classpath = f"{mallet_path}/class:{mallet_path}/lib/mallet-deps.jar"
-    
-    # Start JVM with Mallet's classpath
-    jpype.startJVM(jpype.getDefaultJVMPath(), f"-Djava.class.path={classpath}")
+    try:
+        mallet_path = setup_mallet()
+        classpath = f"{mallet_path}/class:{mallet_path}/lib/mallet-deps.jar"
+        jpype.startJVM(jpype.getDefaultJVMPath(), f"-Djava.class.path={classpath}")
+    except Exception as e:
+        raise RuntimeError(f"Failed to start JVM with Mallet classpath: {e}")
 
 # Import Mallet Java class
-from cc.mallet.classify.tui import Csv2Vectors  # Import after JVM starts
+try:
+    from cc.mallet.classify.tui import Csv2Vectors  # Import after JVM starts
+except ImportError as e:
+    raise ImportError(f"Failed to import Mallet classes. Ensure Mallet JAR files are correctly configured: {e}")
 
 class MalletVectorizer:
     """
