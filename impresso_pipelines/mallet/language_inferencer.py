@@ -33,12 +33,45 @@ import os
 import logging
 import shutil
 import tempfile
+import urllib.request
 from typing import Dict
 from impresso_pipelines.mallet.mallet_vectorizer import MalletVectorizer
-from impresso_pipelines.mallet.mallet_vectorizer_changed import setup_mallet_jars  # Import setup function
+import subprocess
+import sys
+
+# Ensure jpype1 is installed
+try:
+    import jpype
+except ImportError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "jpype1"])
+    import jpype
 
 # Ensure Mallet JAR files are available
-setup_mallet_jars()
+def setup_mallet_jars():
+    mallet_dir = "/content/mallet"  # Directory to store Mallet files on Colab
+    os.makedirs(mallet_dir, exist_ok=True)
+
+    jar_files = {
+        "mallet-deps.jar": "https://huggingface.co/impresso-project/mallet-topic-inferencer/resolve/main/mallet/lib/mallet-deps.jar",
+        "mallet.jar": "https://huggingface.co/impresso-project/mallet-topic-inferencer/resolve/main/mallet/lib/mallet.jar",
+    }
+
+    for jar_name, jar_url in jar_files.items():
+        jar_path = os.path.join(mallet_dir, jar_name)
+        if not os.path.exists(jar_path):
+            logging.info(f"Downloading {jar_name} from {jar_url}")
+            urllib.request.urlretrieve(jar_url, jar_path)
+
+    return mallet_dir
+
+# Start JVM if not already running
+if not jpype.isJVMStarted():
+    mallet_dir = setup_mallet_jars()
+    classpath = f"{mallet_dir}/mallet.jar:{mallet_dir}/mallet-deps.jar"
+    
+    # Start JVM with Mallet's classpath
+    jpype.startJVM(jpype.getDefaultJVMPath(), f"-Djava.class.path={classpath}")
+
 
 class LanguageInferencer:
     """
