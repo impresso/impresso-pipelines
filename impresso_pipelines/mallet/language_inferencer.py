@@ -35,7 +35,10 @@ import shutil
 import tempfile
 from typing import Dict
 from impresso_pipelines.mallet.mallet_vectorizer import MalletVectorizer
+from impresso_pipelines.mallet.mallet_vectorizer_changed import setup_mallet_jars  # Import setup function
 
+# Ensure Mallet JAR files are available
+setup_mallet_jars()
 
 class LanguageInferencer:
     """

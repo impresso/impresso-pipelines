@@ -3,14 +3,37 @@ import jpype.imports
 import os
 import logging
 import tempfile
+from huggingface_hub import hf_hub_download  # Import for downloading JAR files
 from typing import List
+
+# Ensure Mallet JAR files are available
+def setup_mallet_jars():
+    mallet_dir = "/tmp/mallet"  # Use a temporary directory for Colab
+    os.makedirs(mallet_dir, exist_ok=True)
+
+    # Define the required JAR files
+    jar_files = {
+        "mallet-deps.jar": "mallet/lib/mallet-deps.jar",
+        "mallet.jar": "mallet/lib/mallet.jar",
+    }
+
+    # Download JAR files from Hugging Face if they are missing
+    for jar_name, jar_path in jar_files.items():
+        local_path = os.path.join(mallet_dir, jar_name)
+        if not os.path.exists(local_path):
+            print(f"Downloading {jar_name}...")
+            hf_hub_download(
+                repo_id="impresso-project/mallet-topic-inferencer",
+                filename=jar_path,
+                local_dir=mallet_dir,
+                local_dir_use_symlinks=False,
+            )
+    return mallet_dir
 
 # Start JVM if not already running
 if not jpype.isJVMStarted():
-    mallet_path = "/opt/mallet"  # Adjust this path if necessary
-    classpath = f"{mallet_path}/class:{mallet_path}/lib/mallet-deps.jar"
-    
-    # Start JVM with Mallet's classpath
+    mallet_dir = setup_mallet_jars()
+    classpath = f"{mallet_dir}/mallet-deps.jar:{mallet_dir}/mallet.jar"
     jpype.startJVM(jpype.getDefaultJVMPath(), f"-Djava.class.path={classpath}")
 
 # Import Mallet Java class

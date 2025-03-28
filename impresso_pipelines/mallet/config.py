@@ -1,7 +1,7 @@
 SUPPORTED_LANGUAGES = {
     "de": "de_core_news_md",
     "fr": "fr_core_news_md",
-    "lb": None,  # No official SpaCy model for Luxembourgish
+    "lb": None, 
 }
 
 MODEL_URLS = {
