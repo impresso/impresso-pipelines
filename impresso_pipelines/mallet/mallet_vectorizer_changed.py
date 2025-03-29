@@ -14,32 +14,13 @@ import logging
 import tempfile
 import urllib.request
 from typing import List
+from huggingface_hub import hf_hub_download
 
-# Ensure Mallet JAR files are available
-def setup_mallet_jars():
-    mallet_dir = "/content/mallet"  # Directory to store Mallet files on Colab
-    os.makedirs(mallet_dir, exist_ok=True)
-
-    jar_files = {
-        "mallet-deps.jar": "https://huggingface.co/impresso-project/mallet-topic-inferencer/resolve/main/mallet/lib/mallet-deps.jar",
-        "mallet.jar": "https://huggingface.co/impresso-project/mallet-topic-inferencer/resolve/main/mallet/lib/mallet.jar",
-    }
-
-    for jar_name, jar_url in jar_files.items():
-        jar_path = os.path.join(mallet_dir, jar_name)
-        if not os.path.exists(jar_path):
-            logging.info(f"Downloading {jar_name} from {jar_url}")
-            urllib.request.urlretrieve(jar_url, jar_path)
-
-    return mallet_dir
+# from impresso_pipelines.mallet.mallet_setup import initialize_jvm
 
 # Start JVM if not already running
-if not jpype.isJVMStarted():
-    mallet_dir = setup_mallet_jars()
-    classpath = f"{mallet_dir}/mallet.jar:{mallet_dir}/mallet-deps.jar"
-    
-    # Start JVM with Mallet's classpath
-    jpype.startJVM(jpype.getDefaultJVMPath(), f"-Djava.class.path={classpath}")
+# initialize_jvm()
+
 
 # Import Mallet Java class
 from cc.mallet.classify.tui import Csv2Vectors  # Import after JVM starts

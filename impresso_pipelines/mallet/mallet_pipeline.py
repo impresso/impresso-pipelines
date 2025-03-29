@@ -6,6 +6,15 @@ import os
 from huggingface_hub import hf_hub_url, hf_hub_download, list_repo_files  # Add list_repo_files import
 import tempfile  # Add import for temporary directory
 import shutil  # Add import for removing directories
+import subprocess
+import sys
+import logging
+import urllib.request
+try:
+    import jpype
+except ImportError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "jpype1"])
+    import jpype
 
 
 
@@ -13,7 +22,57 @@ class MalletPipeline:
     def __init__(self):
         self.temp_dir = tempfile.mkdtemp(prefix="mallet_models_")  # Create temp folder for models
         self.temp_output_file = None  # Placeholder for temporary output file
-        pass
+
+        # Start JVM if not already running
+        if not jpype.isJVMStarted():
+            mallet_dir = self.setup_mallet_jars()  # Use temporary directory
+            # need to add mallet/lib since thats how it saves from hf_hub_download
+            classpath = f"{mallet_dir}/mallet/lib/mallet.jar:{mallet_dir}/mallet/lib/mallet-deps.jar"
+            
+            # Start JVM with Mallet's classpath
+            jpype.startJVM(jpype.getDefaultJVMPath(), f"-Djava.class.path={classpath}")
+
+
+    # def setup_mallet_jars(self):
+    #     """
+    #     Ensures that the Mallet JAR files are available locally in a temporary directory.
+
+    #     Returns:
+    #         str: Path to the directory containing the Mallet JAR files.
+    #     """
+    #     # mallet_dir = tempfile.mkdtemp(prefix="mallet_")  # Create a temporary directory
+    #     jar_files = {
+    #         "mallet-deps.jar": "https://huggingface.co/impresso-project/mallet-topic-inferencer/resolve/main/mallet/lib/mallet-deps.jar",
+    #         "mallet.jar": "https://huggingface.co/impresso-project/mallet-topic-inferencer/resolve/main/mallet/lib/mallet.jar",
+    #     }
+
+    #     for jar_name, jar_url in jar_files.items():
+    #         jar_path = os.path.join(self.temp_dir, jar_name)
+    #         if not os.path.exists(jar_path):
+    #             logging.info(f"Downloading {jar_name} from {jar_url}")
+    #             urllib.request.urlretrieve(jar_url, jar_path)
+
+    #     return self.temp_dir
+    
+    def setup_mallet_jars(self):
+        """
+        Ensures that the Mallet JAR files are available locally in a temporary directory.
+
+        Returns:
+            str: Path to the directory containing the Mallet JAR files.
+        """
+        
+        jar_files = ["mallet.jar", "mallet-deps.jar"]
+        for jar_name in jar_files:
+            logging.info(f"Downloading {jar_name} from Hugging Face Hub...")
+            hf_hub_download(
+                repo_id="impresso-project/mallet-topic-inferencer",
+                filename=f"mallet/lib/{jar_name}",
+                local_dir=self.temp_dir,
+                # local_dir_use_symlinks=False  # to avoid issues in Colab
+            )
+        return self.temp_dir
+
 
     def __call__(self, text, language=None, output_file=None):
         try:
