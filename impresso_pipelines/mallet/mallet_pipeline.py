@@ -33,49 +33,12 @@ class MalletPipeline:
             jpype.startJVM(jpype.getDefaultJVMPath(), f"-Djava.class.path={classpath}")
 
 
-    # def setup_mallet_jars(self):
-    #     """
-    #     Ensures that the Mallet JAR files are available locally in a temporary directory.
-
-    #     Returns:
-    #         str: Path to the directory containing the Mallet JAR files.
-    #     """
-    #     # mallet_dir = tempfile.mkdtemp(prefix="mallet_")  # Create a temporary directory
-    #     jar_files = {
-    #         "mallet-deps.jar": "https://huggingface.co/impresso-project/mallet-topic-inferencer/resolve/main/mallet/lib/mallet-deps.jar",
-    #         "mallet.jar": "https://huggingface.co/impresso-project/mallet-topic-inferencer/resolve/main/mallet/lib/mallet.jar",
-    #     }
-
-    #     for jar_name, jar_url in jar_files.items():
-    #         jar_path = os.path.join(self.temp_dir, jar_name)
-    #         if not os.path.exists(jar_path):
-    #             logging.info(f"Downloading {jar_name} from {jar_url}")
-    #             urllib.request.urlretrieve(jar_url, jar_path)
-
-    #     return self.temp_dir
-    
-    def setup_mallet_jars(self):
-        """
-        Ensures that the Mallet JAR files are available locally in a temporary directory.
-
-        Returns:
-            str: Path to the directory containing the Mallet JAR files.
-        """
-        
-        jar_files = ["mallet.jar", "mallet-deps.jar"]
-        for jar_name in jar_files:
-            logging.info(f"Downloading {jar_name} from Hugging Face Hub...")
-            hf_hub_download(
-                repo_id="impresso-project/mallet-topic-inferencer",
-                filename=f"mallet/lib/{jar_name}",
-                local_dir=self.temp_dir,
-                # local_dir_use_symlinks=False  # to avoid issues in Colab
-            )
-        return self.temp_dir
-
-
     def __call__(self, text, language=None, output_file=None):
         try:
+            # Ensure the temporary directory exists
+            if not os.path.exists(self.temp_dir):
+                self.temp_dir = tempfile.mkdtemp(prefix="mallet_models_")
+
             # Use a temporary file if no output file is provided
             if output_file is None:
                 self.temp_output_file = tempfile.NamedTemporaryFile(
@@ -112,13 +75,16 @@ class MalletPipeline:
 
             return output  # Returns clean lemmatized text without punctuation
         finally:
-            # Remove the temporary directory and files after execution
+            # Safely remove the temporary directory and files after execution
             if self.temp_output_file and os.path.exists(self.temp_output_file.name):
                 os.remove(self.temp_output_file.name)
                 print(f"Temporary output file {self.temp_output_file.name} has been removed.")
             if os.path.exists(self.temp_dir):
-                shutil.rmtree(self.temp_dir)
-                print(f"Temporary directory {self.temp_dir} has been removed.")
+                try:
+                    shutil.rmtree(self.temp_dir)
+                    print(f"Temporary directory {self.temp_dir} has been removed.")
+                except Exception as e:
+                    print(f"Failed to remove temporary directory {self.temp_dir}: {e}")
 
     def language_detection(self, text):
         lang_model = LangIdentPipeline()
@@ -137,6 +103,25 @@ class MalletPipeline:
 
         nlp = SPACY()
         return nlp(text, model_id)
+
+    def setup_mallet_jars(self):
+        """
+        Ensures that the Mallet JAR files are available locally in a temporary directory.
+
+        Returns:
+            str: Path to the directory containing the Mallet JAR files.
+        """
+        
+        jar_files = ["mallet.jar", "mallet-deps.jar"]
+        for jar_name in jar_files:
+            logging.info(f"Downloading {jar_name} from Hugging Face Hub...")
+            hf_hub_download(
+                repo_id="impresso-project/mallet-topic-inferencer",
+                filename=f"mallet/lib/{jar_name}",
+                local_dir=self.temp_dir,
+                # local_dir_use_symlinks=False  # to avoid issues in Colab
+            )
+        return self.temp_dir
 
     def download_required_files(self):
         """
