@@ -136,6 +136,16 @@ class MalletPipeline:
         repo_id = "impresso-project/mallet-topic-inferencer"
         base_path = "models/tm"
         
+        # Check if files already exist in the temp directory
+        existing_files = [
+            f"tm-{self.language}-all-v2.0.pipe",
+            f"tm-{self.language}-all-v2.0.inferencer",
+            f"tm-{self.language}-all-v2.0.vocab.lemmatization.tsv.gz"
+        ]
+        if all(os.path.exists(os.path.join(self.temp_dir, base_path, file)) for file in existing_files):
+            logging.info(f"All required files for language '{self.language}' already exist in the temporary directory.")
+            return
+
         # Fetch all files in the repository
         try:
             repo_files = list_repo_files(repo_id)
