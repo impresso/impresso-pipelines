@@ -33,77 +33,27 @@ class MalletPipeline:
             jpype.startJVM(jpype.getDefaultJVMPath(), f"-Djava.class.path={classpath}")
 
 
-    def __call__(self, text, language=None, output_file=None):
-        try:
-            # Ensure the temporary directory exists
-            if not os.path.exists(self.temp_dir):
-                self.temp_dir = tempfile.mkdtemp(prefix="mallet_models_")
+    # def setup_mallet_jars(self):
+    #     """
+    #     Ensures that the Mallet JAR files are available locally in a temporary directory.
 
-            # Use a temporary file if no output file is provided
-            if output_file is None:
-                self.temp_output_file = tempfile.NamedTemporaryFile(
-                    prefix="tmp_output_", suffix=".mallet", dir=self.temp_dir, delete=False
-                )
-                self.output_file = self.temp_output_file.name
-            else:
-                self.output_file = output_file
+    #     Returns:
+    #         str: Path to the directory containing the Mallet JAR files.
+    #     """
+    #     # mallet_dir = tempfile.mkdtemp(prefix="mallet_")  # Create a temporary directory
+    #     jar_files = {
+    #         "mallet-deps.jar": "https://huggingface.co/impresso-project/mallet-topic-inferencer/resolve/main/mallet/lib/mallet-deps.jar",
+    #         "mallet.jar": "https://huggingface.co/impresso-project/mallet-topic-inferencer/resolve/main/mallet/lib/mallet.jar",
+    #     }
 
-            # PART 1: Language Identification
-            self.language = language
-            if self.language is None:
-                self.language_detection(text)
+    #     for jar_name, jar_url in jar_files.items():
+    #         jar_path = os.path.join(self.temp_dir, jar_name)
+    #         if not os.path.exists(jar_path):
+    #             logging.info(f"Downloading {jar_name} from {jar_url}")
+    #             urllib.request.urlretrieve(jar_url, jar_path)
 
-            from impresso_pipelines.mallet.config import SUPPORTED_LANGUAGES  # Lazy import
-            if self.language not in SUPPORTED_LANGUAGES:
-                raise ValueError(f"Unsupported language: {self.language}. Supported languages are: {SUPPORTED_LANGUAGES.keys()}")
-
-            # Part 1.5: Download required files from huggingface model hub
-            self.download_required_files()
-
-            # PART 2: Lemmatization using SpaCy
-            lemma_text = self.SPACY(text)
-
-            # PART 3: Vectorization using Mallet
-            self.vectorizer_mallet(lemma_text, self.output_file)
-
-            # PART 4: Mallet inferencer and JSONification
-            self.mallet_inferencer()
-
-            # PART 5: Return the JSON output
-            output = self.json_output(filepath=os.path.join(self.temp_dir, "tmp_output.jsonl"))
-
-
-            return output  # Returns clean lemmatized text without punctuation
-        finally:
-            # Safely remove the temporary directory and files after execution
-            if self.temp_output_file and os.path.exists(self.temp_output_file.name):
-                os.remove(self.temp_output_file.name)
-                print(f"Temporary output file {self.temp_output_file.name} has been removed.")
-            if os.path.exists(self.temp_dir):
-                try:
-                    shutil.rmtree(self.temp_dir)
-                    print(f"Temporary directory {self.temp_dir} has been removed.")
-                except Exception as e:
-                    print(f"Failed to remove temporary directory {self.temp_dir}: {e}")
-
-    def language_detection(self, text):
-        lang_model = LangIdentPipeline()
-        lang_result = lang_model(text)
-        self.language = lang_result["language"]
-        return self.language
+    #     return self.temp_dir
     
-    def SPACY(self, text):
-        """Uses the appropriate SpaCy model based on language"""
-        from impresso_pipelines.mallet.SPACY import SPACY  # Lazy import
-        from impresso_pipelines.mallet.config import SUPPORTED_LANGUAGES  # Lazy import
-
-        model_id = SUPPORTED_LANGUAGES[self.language]
-        if not model_id:
-            raise ValueError(f"No SpaCy model available for {self.language}")
-
-        nlp = SPACY()
-        return nlp(text, model_id)
-
     def setup_mallet_jars(self):
         """
         Ensures that the Mallet JAR files are available locally in a temporary directory.
@@ -122,6 +72,61 @@ class MalletPipeline:
                 # local_dir_use_symlinks=False  # to avoid issues in Colab
             )
         return self.temp_dir
+
+
+    def __call__(self, text, language=None, output_file=None):
+        if output_file is None:
+            self.temp_output_file = tempfile.NamedTemporaryFile(
+                prefix="tmp_output_", suffix=".mallet", dir=self.temp_dir, delete=False
+            )
+            self.output_file = self.temp_output_file.name
+        else:
+            self.output_file = output_file
+
+        # PART 1: Language Identification
+        self.language = language
+        if self.language is None:
+            self.language_detection(text)
+
+        from impresso_pipelines.mallet.config import SUPPORTED_LANGUAGES  # Lazy import
+        if self.language not in SUPPORTED_LANGUAGES:
+            raise ValueError(f"Unsupported language: {self.language}. Supported languages are: {SUPPORTED_LANGUAGES.keys()}")
+
+        # Part 1.5: Download required files from huggingface model hub
+        self.download_required_files()
+
+        # PART 2: Lemmatization using SpaCy
+        lemma_text = self.SPACY(text)
+
+        # PART 3: Vectorization using Mallet
+        self.vectorizer_mallet(lemma_text, self.output_file)
+
+        # PART 4: Mallet inferencer and JSONification
+        self.mallet_inferencer()
+
+        # PART 5: Return the JSON output
+        output = self.json_output(filepath=os.path.join(self.temp_dir, "tmp_output.jsonl"))
+
+
+        return output  # Returns clean lemmatized text without punctuation
+
+    def language_detection(self, text):
+        lang_model = LangIdentPipeline()
+        lang_result = lang_model(text)
+        self.language = lang_result["language"]
+        return self.language
+    
+    def SPACY(self, text):
+        """Uses the appropriate SpaCy model based on language"""
+        from impresso_pipelines.mallet.SPACY import SPACY  # Lazy import
+        from impresso_pipelines.mallet.config import SUPPORTED_LANGUAGES  # Lazy import
+
+        model_id = SUPPORTED_LANGUAGES[self.language]
+        if not model_id:
+            raise ValueError(f"No SpaCy model available for {self.language}")
+
+        nlp = SPACY()
+        return nlp(text, model_id)
 
     def download_required_files(self):
         """
