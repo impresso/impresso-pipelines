@@ -21,6 +21,7 @@ class MalletPipeline:
     def __init__(self):
         self.temp_dir = tempfile.mkdtemp(prefix="mallet_models_")  # Create temp folder for models
         self.temp_output_file = None  # Placeholder for temporary output file
+        self.latest_model = None
 
         # Start JVM if not already running
         if not jpype.isJVMStarted():
@@ -72,8 +73,8 @@ class MalletPipeline:
         if self.language not in SUPPORTED_LANGUAGES:
             raise ValueError(f"Unsupported language: {self.language}. Supported languages are: {SUPPORTED_LANGUAGES.keys()}")
 
-        # # Part 1.5: Download required files from huggingface model hub
-        # self.download_required_files()
+        # Part 1.5: Find the latest model version
+        self.find_latest_model_version()
 
         # PART 2: Lemmatization using SpaCy
         lemma_text = self.SPACY(text)
@@ -89,6 +90,25 @@ class MalletPipeline:
 
 
         return output  # Returns clean lemmatized text without punctuation
+    
+    def find_latest_model_version(self):
+        """
+        Finds the latest model version from the Hugging Face Hub.
+
+        Returns:
+            str: The latest model version.
+        """
+        repo_id = "impresso-project/mallet-topic-inferencer"
+        files = list_repo_files(repo_id)
+        versions = [f for f in files if f.startswith(f"models/tm/tm-{self.language}-all") and f.endswith(".pipe")] # check version of pipe 
+        
+        # Extract version numbers and find the latest one
+        versions.sort(reverse=True)
+        # extract the version number from the filename and set self.latest_model to the latest version
+        if versions:
+            self.latest_model = versions[0].split('-v')[-1].replace('.pipe', '')
+        else:
+            raise ValueError(f"Could not get latest version for language: {self.language}")
 
     def language_detection(self, text):
         lang_model = LangIdentPipeline()
@@ -139,8 +159,9 @@ class MalletPipeline:
         # Load the Mallet pipeline
         pipe_file = hf_hub_download(
             repo_id="impresso-project/mallet-topic-inferencer",
-            filename=f"models/tm/tm-{self.language}-all-v2.0.pipe"
+            filename=f"models/tm/tm-{self.language}-all-v{self.latest_model}.pipe"
         )
+
         
         mallet = MalletVectorizer(pipe_file, output_file)
         mallet(text)
@@ -148,14 +169,16 @@ class MalletPipeline:
     def mallet_inferencer(self):
         lang = self.language  # adjusting calling based on language
 
+
         inferencer_pipe = hf_hub_download(
             repo_id="impresso-project/mallet-topic-inferencer",
-            filename=f"models/tm/tm-{lang}-all-v2.0.pipe"
+            filename=f"models/tm/tm-{lang}-all-v{self.latest_model}.pipe"
         )
         inferencer_file = hf_hub_download(
             repo_id="impresso-project/mallet-topic-inferencer",
-            filename=f"models/tm/tm-{lang}-all-v2.0.inferencer"
+            filename=f"models/tm/tm-{lang}-all-v{self.latest_model}.inferencer"
         )
+
 
         args = argparse.Namespace(
             input=self.output_file,  # Use the dynamically created output file
