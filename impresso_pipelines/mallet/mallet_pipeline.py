@@ -9,7 +9,6 @@ import shutil  # Add import for removing directories
 import subprocess
 import sys
 import logging
-import urllib.request
 try:
     import jpype
 except ImportError:
@@ -25,53 +24,34 @@ class MalletPipeline:
 
         # Start JVM if not already running
         if not jpype.isJVMStarted():
-            mallet_dir = self.setup_mallet_jars()  # Use temporary directory
+            mallet_dir = self.setup_mallet_jars()  # Use Hugging Face caching
             # need to add mallet/lib since thats how it saves from hf_hub_download
-            classpath = f"{mallet_dir}/mallet/lib/mallet.jar:{mallet_dir}/mallet/lib/mallet-deps.jar"
+            classpath = f"{mallet_dir}/mallet.jar:{mallet_dir}/mallet-deps.jar"
             
             # Start JVM with Mallet's classpath
             jpype.startJVM(jpype.getDefaultJVMPath(), f"-Djava.class.path={classpath}")
 
-
-    # def setup_mallet_jars(self):
-    #     """
-    #     Ensures that the Mallet JAR files are available locally in a temporary directory.
-
-    #     Returns:
-    #         str: Path to the directory containing the Mallet JAR files.
-    #     """
-    #     # mallet_dir = tempfile.mkdtemp(prefix="mallet_")  # Create a temporary directory
-    #     jar_files = {
-    #         "mallet-deps.jar": "https://huggingface.co/impresso-project/mallet-topic-inferencer/resolve/main/mallet/lib/mallet-deps.jar",
-    #         "mallet.jar": "https://huggingface.co/impresso-project/mallet-topic-inferencer/resolve/main/mallet/lib/mallet.jar",
-    #     }
-
-    #     for jar_name, jar_url in jar_files.items():
-    #         jar_path = os.path.join(self.temp_dir, jar_name)
-    #         if not os.path.exists(jar_path):
-    #             logging.info(f"Downloading {jar_name} from {jar_url}")
-    #             urllib.request.urlretrieve(jar_url, jar_path)
-
-    #     return self.temp_dir
     
     def setup_mallet_jars(self):
         """
-        Ensures that the Mallet JAR files are available locally in a temporary directory.
+        Ensures that the Mallet JAR files are available locally using Hugging Face caching.
 
         Returns:
             str: Path to the directory containing the Mallet JAR files.
         """
-        
         jar_files = ["mallet.jar", "mallet-deps.jar"]
+        jar_paths = []
+
         for jar_name in jar_files:
             logging.info(f"Downloading {jar_name} from Hugging Face Hub...")
-            hf_hub_download(
+            jar_path = hf_hub_download(
                 repo_id="impresso-project/mallet-topic-inferencer",
-                filename=f"mallet/lib/{jar_name}",
-                local_dir=self.temp_dir,
-                # local_dir_use_symlinks=False  # to avoid issues in Colab
+                filename=f"mallet/lib/{jar_name}"
             )
-        return self.temp_dir
+            jar_paths.append(jar_path)
+
+        # Return the directory containing the first JAR file (all files are in the same directory)
+        return os.path.dirname(jar_paths[0])
 
 
     def __call__(self, text, language=None, output_file=None):
@@ -92,8 +72,8 @@ class MalletPipeline:
         if self.language not in SUPPORTED_LANGUAGES:
             raise ValueError(f"Unsupported language: {self.language}. Supported languages are: {SUPPORTED_LANGUAGES.keys()}")
 
-        # Part 1.5: Download required files from huggingface model hub
-        self.download_required_files()
+        # # Part 1.5: Download required files from huggingface model hub
+        # self.download_required_files()
 
         # PART 2: Lemmatization using SpaCy
         lemma_text = self.SPACY(text)
@@ -128,81 +108,39 @@ class MalletPipeline:
         nlp = SPACY()
         return nlp(text, model_id)
 
-    def download_required_files(self):
-        """
-        Downloads the required files for the specified language from the Hugging Face repository.
-        Checks for the newest version available for the specified language.
-        """
-        repo_id = "impresso-project/mallet-topic-inferencer"
-        base_path = "models/tm"
-        
-        # Check if files already exist in the temp directory
-        existing_files = [
-            f"tm-{self.language}-all-v2.0.pipe",
-            f"tm-{self.language}-all-v2.0.inferencer",
-            f"tm-{self.language}-all-v2.0.vocab.lemmatization.tsv.gz"
-        ]
-        if all(os.path.exists(os.path.join(self.temp_dir, base_path, file)) for file in existing_files):
-            logging.info(f"All required files for language '{self.language}' already exist in the temporary directory.")
-            return
+    # def download_required_files(self):
+    #     """
+    #     Downloads the required files for the specified language using Hugging Face caching.
+    #     """
+    #     repo_id = "impresso-project/mallet-topic-inferencer"
+    #     base_path = "models/tm"
 
-        # Fetch all files in the repository
-        try:
-            repo_files = list_repo_files(repo_id)
-        except Exception as e:
-            raise RuntimeError(f"Failed to list files in repository {repo_id}: {e}")
+    #     # Define the required files for the language
+    #     files_to_download = [
+    #         f"{base_path}/tm-{self.language}-all-v2.0.pipe",
+    #         f"{base_path}/tm-{self.language}-all-v2.0.inferencer",
+    #         f"{base_path}/tm-{self.language}-all-v2.0.vocab.lemmatization.tsv.gz"
+    #     ]
 
-        # Filter files for the specified language and find the newest version
-        language_files = [f for f in repo_files if f.startswith(f"{base_path}/tm-{self.language}-all-v")]
-
-        if not language_files:
-            raise FileNotFoundError(f"No files found for language {self.language} in repository {repo_id}")
-
-        # Extract version numbers and sort to find the newest version
-        language_files.sort(key=lambda x: int(x.split('-v')[-1].split('.')[0]), reverse=True)
-        newest_version_files = [f for f in language_files if f.split('-v')[1].split('.')[0] == language_files[0].split('-v')[1].split('.')[0]]
-
-        # Define the required files for the newest version
-        files_to_download = [
-            f for f in newest_version_files if any(ext in f for ext in [".pipe", ".inferencer", ".vocab.lemmatization.tsv.gz"])
-        ]
-
-        for file_path in files_to_download:
-            try:
-                file_name = os.path.basename(file_path)
-                local_path = os.path.join(self.temp_dir, file_path)  # Include subdirectory in path
-                print(f"Attempting to download {file_path} to {local_path}...")  # Debug log
-
-                # Download the file
-                downloaded_path = hf_hub_download(
-                    repo_id=repo_id,
-                    filename=file_path,
-                    local_dir=self.temp_dir,
-                    local_dir_use_symlinks=False
-                )
-
-                # Verify the downloaded file path
-                if not os.path.exists(downloaded_path):
-                    raise FileNotFoundError(f"File {downloaded_path} was not downloaded correctly.")
-                if not os.access(downloaded_path, os.R_OK):
-                    raise PermissionError(f"File {downloaded_path} is not readable.")
-
-                print(f"Successfully downloaded {file_name} to {downloaded_path}")
-            except Exception as e:
-                print(f"Error downloading {file_path}: {e}")  # Log the error
-                raise RuntimeError(f"Failed to download {file_path} from {repo_id}: {e}")
+    #     for file_path in files_to_download:
+    #         try:
+    #             logging.info(f"Downloading {file_path} from Hugging Face Hub...")
+    #             hf_hub_download(
+    #                 repo_id=repo_id,
+    #                 filename=file_path
+    #             )
+    #         except Exception as e:
+    #             logging.error(f"Error downloading {file_path}: {e}")
+    #             raise RuntimeError(f"Failed to download {file_path} from {repo_id}: {e}")
 
     def vectorizer_mallet(self, text, output_file):
         from impresso_pipelines.mallet.mallet_vectorizer_changed import MalletVectorizer  # Lazy import
 
         # Load the Mallet pipeline
-        pipe_file = os.path.join(self.temp_dir, "models/tm", f"tm-{self.language}-all-v2.0.pipe")  # Adjust path
-        
-        # Verify the pipe file exists and is readable
-        if not os.path.exists(pipe_file):
-            raise FileNotFoundError(f"Pipe file not found: {pipe_file}")
-        if not os.access(pipe_file, os.R_OK):
-            raise PermissionError(f"Pipe file is not readable: {pipe_file}")
+        pipe_file = hf_hub_download(
+            repo_id="impresso-project/mallet-topic-inferencer",
+            filename=f"models/tm/tm-{self.language}-all-v2.0.pipe"
+        )
         
         mallet = MalletVectorizer(pipe_file, output_file)
         mallet(text)
@@ -210,18 +148,14 @@ class MalletPipeline:
     def mallet_inferencer(self):
         lang = self.language  # adjusting calling based on language
 
-        inferencer_pipe = os.path.join(self.temp_dir, "models/tm", f"tm-{lang}-all-v2.0.pipe")  # Adjust path
-        inferencer_file = os.path.join(self.temp_dir, "models/tm", f"tm-{lang}-all-v2.0.inferencer")  # Adjust path
-
-        # Verify the inferencer files exist and are readable
-        if not os.path.exists(inferencer_pipe):
-            raise FileNotFoundError(f"Inferencer pipe file not found: {inferencer_pipe}")
-        if not os.access(inferencer_pipe, os.R_OK):
-            raise PermissionError(f"Inferencer pipe file is not readable: {inferencer_pipe}")
-        if not os.path.exists(inferencer_file):
-            raise FileNotFoundError(f"Inferencer file not found: {inferencer_file}")
-        if not os.access(inferencer_file, os.R_OK):
-            raise PermissionError(f"Inferencer file is not readable: {inferencer_file}")
+        inferencer_pipe = hf_hub_download(
+            repo_id="impresso-project/mallet-topic-inferencer",
+            filename=f"models/tm/tm-{lang}-all-v2.0.pipe"
+        )
+        inferencer_file = hf_hub_download(
+            repo_id="impresso-project/mallet-topic-inferencer",
+            filename=f"models/tm/tm-{lang}-all-v2.0.inferencer"
+        )
 
         args = argparse.Namespace(
             input=self.output_file,  # Use the dynamically created output file
