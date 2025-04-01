@@ -125,8 +125,8 @@ class MalletPipeline:
         if not model_id:
             raise ValueError(f"No SpaCy model available for {self.language}")
 
-        nlp = SPACY()
-        return nlp(text, model_id)
+        nlp = SPACY(model_id, self.language)
+        return nlp(text)
 
     # def download_required_files(self):
     #     """
