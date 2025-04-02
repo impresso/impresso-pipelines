@@ -125,7 +125,7 @@ class MalletPipeline:
         if not model_id:
             raise ValueError(f"No SpaCy model available for {self.language}")
 
-        nlp = SPACY(model_id, self.language)
+        nlp = SPACY(model_id, self.language, self.latest_model)
         return nlp(text)
 
     # def download_required_files(self):
@@ -162,6 +162,7 @@ class MalletPipeline:
             filename=f"models/tm/tm-{self.language}-all-v{self.latest_model}.pipe"
         )
 
+
         
         mallet = MalletVectorizer(pipe_file, output_file)
         mallet(text)
@@ -174,10 +175,12 @@ class MalletPipeline:
             repo_id="impresso-project/mallet-topic-inferencer",
             filename=f"models/tm/tm-{lang}-all-v{self.latest_model}.pipe"
         )
-        inferencer_file = hf_hub_download(
+        
+        inferencer_file = hf_hub_download(  
             repo_id="impresso-project/mallet-topic-inferencer",
             filename=f"models/tm/tm-{lang}-all-v{self.latest_model}.inferencer"
         )
+      
 
 
         args = argparse.Namespace(
