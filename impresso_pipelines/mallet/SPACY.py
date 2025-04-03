@@ -17,11 +17,6 @@ class SPACY:
         if not model_url:
             raise ValueError(f"No SpaCy model available for {model_id}")
         
-        # model_id = "https://github.com/explosion/spacy-models/releases/download/de_core_news_md-3.6.0/de_core_news_md-3.6.0.tar.gz"
-            
-        # self.download_model(model_id)
-        # self.nlp = spacy.load(model_id, disable=["parser", "ner"])
-
         path_to_model = self.download_and_extract_model(model_url)
         self.nlp = spacy.load(path_to_model, disable=["parser", "ner"])
 
@@ -29,7 +24,7 @@ class SPACY:
         # prepare and load lemmatization file and lower case it
         lemmatization_file = hf_hub_download(
             repo_id="impresso-project/mallet-topic-inferencer",
-            filename=f"models/tm/tm-{language}-all-v2.0.vocab.lemmatization.tsv.gz"
+            filename=f"models/tm/tm-{language}-all-v{latest_version}.vocab.lemmatization.tsv.gz"
         )
         # load the file, lower case the first column, make dict, first column key and third value
         self.lemmatization_dict = {}
@@ -61,23 +56,32 @@ class SPACY:
             subprocess.run(["python", "-m", "spacy", "download", model_id], check=True)
 
     def download_and_extract_model(self, model_url):
-        """Downloads and extracts the SpaCy model tar file to a temporary directory."""
+        """Downloads and extracts the SpaCy model tar file to a cache directory."""
+        cache_dir = os.path.expanduser("~/.cache/spacy_models")
+        os.makedirs(cache_dir, exist_ok=True)
+
+        # Generate a unique filename for the model based on its URL
+        model_filename = os.path.basename(model_url)
+        cached_model_path = os.path.join(cache_dir, model_filename)
+
+        # Check if the model is already cached
+        if os.path.exists(cached_model_path):
+            print(f"Using cached SpaCy model from: {cached_model_path}")
+        else:
+            # Download the tar file
+            print(f"Downloading SpaCy model from: {model_url}...")
+            response = requests.get(model_url, stream=True)
+            response.raise_for_status()
+            with open(cached_model_path, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
+        # Extract the tar file to a temporary directory
         temp_dir = tempfile.mkdtemp()
-        tar_path = os.path.join(temp_dir, "model.tar.gz")
-        
-        # Download the tar file
-        print(f"Downloading SpaCy model from: {model_url}...")
-        response = requests.get(model_url, stream=True)
-        response.raise_for_status()
-        with open(tar_path, "wb") as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
-        
-        # Extract the tar file
         print(f"Extracting SpaCy model to: {temp_dir}...")
-        with tarfile.open(tar_path, "r:gz") as tar:
+        with tarfile.open(cached_model_path, "r:gz") as tar:
             tar.extractall(path=temp_dir)
-        
+
         # Locate the directory containing the config.cfg file
         for root, dirs, files in os.walk(temp_dir):
             if "config.cfg" in files:
@@ -86,7 +90,7 @@ class SPACY:
                 final_model_dir = os.path.join(temp_dir, "model")
                 shutil.move(model_dir, final_model_dir)
                 return final_model_dir
-        
+
         raise IOError("Could not find config.cfg in the extracted model directory.")
 
     def __call__(self, text):
@@ -108,6 +112,7 @@ class SPACY:
             if (token.pos_ or self.map_tag_to_pos(token.tag_)) in self.upos_filter
         ]
 
+        # print("French lemmatized tokens:", lemmatized_text)
 
         return lemmatized_text
 
@@ -122,6 +127,5 @@ class SPACY:
             "D": "DET",
             "KO": "CCONJ",
             "PTK": "PART",
-            # extend this as needed based on model output
         }
         return tag_map.get(tag, "")

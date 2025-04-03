@@ -51,8 +51,10 @@ class MalletVectorizer:
             prefix="temp_input_", suffix=".csv", dir=os.path.dirname(self.output_file), delete=False
         )
         with open(temp_input_file.name, "w", encoding="utf-8") as temp_file:
-            temp_file.write("id\tclass\ttext\n")
+            # temp_file.write("id\tclass\ttext\n")
             temp_file.write(f"1\tdummy\t{' '.join(lemmatized_words)}\n")
+            # temp_file.write(f"USERINPUT-001\tdummy\t{' '.join(lemmatized_words)}\n")
+
 
         # Arguments for Csv2Vectors
         arguments = [
