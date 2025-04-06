@@ -479,6 +479,7 @@ class MalletTopicInferencer:
         # Run topic inference
         doctopics_file = self.run_topic_inference(self.args.input)
 
+
         if self.args.output_format == "csv":
             self.merge_inference_results({self.args.languages[0]: doctopics_file})
         elif self.args.output_format == "jsonl":
@@ -535,6 +536,7 @@ class MalletTopicInferencer:
                 for doc_id, text in docs:
                     csv_writer.writerow([doc_id, language, text])
                 csv_file_path = temp_csv_file.name
+                
 
             # Run topic inference
             inferencer = self.language_inferencers[language]
@@ -562,6 +564,7 @@ class MalletTopicInferencer:
             if logging.getLogger().getEffectiveLevel() != logging.DEBUG:
                 logging.info("Deleting temporary file: %s", csv_file_path + ".mallet")
                 os.remove(csv_file_path + ".mallet")
+        
 
         return results
 

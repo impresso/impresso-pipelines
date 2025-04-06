@@ -69,7 +69,7 @@ class MalletPipeline:
         if self.language is None:
             self.language_detection(text)
 
-        from impresso_pipelines.mallet.config import SUPPORTED_LANGUAGES  # Lazy import
+        from impresso_pipelines.mallet.config import SUPPORTED_LANGUAGES, TOPIC_MODEL_DESCRIPTIONS  # Lazy import
         if self.language not in SUPPORTED_LANGUAGES:
             raise ValueError(f"Unsupported language: {self.language}. Supported languages are: {SUPPORTED_LANGUAGES.keys()}")
 
@@ -88,6 +88,10 @@ class MalletPipeline:
         # PART 5: Return the JSON output
         output = self.json_output(filepath=os.path.join(self.temp_dir, "tmp_output.jsonl"))
 
+        # for each entry in the output list, add key "topic_model_description" with the value from the config file for the language
+        for entry in output:
+            entry["topic_model_description"] = TOPIC_MODEL_DESCRIPTIONS[self.language]
+            
 
         return output  # Returns clean lemmatized text without punctuation
     
@@ -125,42 +129,19 @@ class MalletPipeline:
         if not model_id:
             raise ValueError(f"No SpaCy model available for {self.language}")
 
-        nlp = SPACY(model_id, self.language)
+        nlp = SPACY(model_id, self.language, self.latest_model)
         return nlp(text)
-
-    # def download_required_files(self):
-    #     """
-    #     Downloads the required files for the specified language using Hugging Face caching.
-    #     """
-    #     repo_id = "impresso-project/mallet-topic-inferencer"
-    #     base_path = "models/tm"
-
-    #     # Define the required files for the language
-    #     files_to_download = [
-    #         f"{base_path}/tm-{self.language}-all-v2.0.pipe",
-    #         f"{base_path}/tm-{self.language}-all-v2.0.inferencer",
-    #         f"{base_path}/tm-{self.language}-all-v2.0.vocab.lemmatization.tsv.gz"
-    #     ]
-
-    #     for file_path in files_to_download:
-    #         try:
-    #             logging.info(f"Downloading {file_path} from Hugging Face Hub...")
-    #             hf_hub_download(
-    #                 repo_id=repo_id,
-    #                 filename=file_path
-    #             )
-    #         except Exception as e:
-    #             logging.error(f"Error downloading {file_path}: {e}")
-    #             raise RuntimeError(f"Failed to download {file_path} from {repo_id}: {e}")
 
     def vectorizer_mallet(self, text, output_file):
         from impresso_pipelines.mallet.mallet_vectorizer_changed import MalletVectorizer  # Lazy import
+
 
         # Load the Mallet pipeline
         pipe_file = hf_hub_download(
             repo_id="impresso-project/mallet-topic-inferencer",
             filename=f"models/tm/tm-{self.language}-all-v{self.latest_model}.pipe"
         )
+
 
         
         mallet = MalletVectorizer(pipe_file, output_file)
@@ -174,10 +155,12 @@ class MalletPipeline:
             repo_id="impresso-project/mallet-topic-inferencer",
             filename=f"models/tm/tm-{lang}-all-v{self.latest_model}.pipe"
         )
-        inferencer_file = hf_hub_download(
+        
+        inferencer_file = hf_hub_download(  
             repo_id="impresso-project/mallet-topic-inferencer",
             filename=f"models/tm/tm-{lang}-all-v{self.latest_model}.inferencer"
         )
+      
 
 
         args = argparse.Namespace(
@@ -189,7 +172,7 @@ class MalletPipeline:
             **{
                 f"{lang}_inferencer": inferencer_file,
                 f"{lang}_pipe": inferencer_pipe,
-                f"{lang}_model_id": f"tm-{lang}-all-v2.0",
+                f"{lang}_model_id": f"tm-{lang}-all-v{self.latest_model}",
                 f"{lang}_topic_count": 20
             },
             min_p=0.02,

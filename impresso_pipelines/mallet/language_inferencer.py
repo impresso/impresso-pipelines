@@ -35,7 +35,7 @@ import shutil
 import tempfile
 import urllib.request
 from typing import Dict
-from impresso_pipelines.mallet.mallet_vectorizer import MalletVectorizer
+# from impresso_pipelines.mallet.mallet_vectorizer import MalletVectorizer
 import subprocess
 import sys
 
@@ -62,9 +62,6 @@ class LanguageInferencer:
         self.inferencer_file = inferencer_file
         self.inferencer = InferTopics()
         self.pipe_file = pipe_file
-        self.vectorizer = MalletVectorizer(
-            language=language, pipe_file=self.pipe_file, keep_tmp_file=keep_tmp_files
-        )
         self.keep_tmp_files = keep_tmp_files
         self.random_seed = random_seed
 
@@ -73,56 +70,6 @@ class LanguageInferencer:
                 f"Inferencer file not found: {self.inferencer_file}"
             )
 
-    def run_csv2topics(
-        self, csv_file: str, delete_mallet_file_after: bool = True
-    ) -> Dict[str, str]:
-        """
-        Perform topic inference on a single input file.
-        The input file should be in the format expected by Mallet.
-        Returns a dictionary of document_id -> topic distributions.
-        """
-
-        # Create a temporary copy of the pipe file because Mallet modifies it in this
-        # version of mallet. If run in parallel, the pipe file will be corrupted.
-        with tempfile.NamedTemporaryFile(delete=True) as temp_pipe_file:
-            shutil.copyfile(self.pipe_file, temp_pipe_file.name)
-            temp_pipe_file_path = temp_pipe_file.name
-
-            # Vectorize the input file and write to a temporary file
-            vectorizer = MalletVectorizer(
-                language=self.language,
-                pipe_file=temp_pipe_file_path,
-                keep_tmp_file=self.keep_tmp_files,
-            )
-            mallet_file = vectorizer.run_csv2vectors(csv_file)
-
-            topics_file = mallet_file + ".doctopics"
-
-            arguments = [
-                "--input",
-                mallet_file,
-                "--inferencer",
-                self.inferencer_file,
-                "--output-doc-topics",
-                topics_file,
-                "--random-seed",
-                str(self.random_seed),
-            ]
-
-            logging.info("Calling mallet InferTopics: %s", arguments)
-
-            self.inferencer.main(arguments)
-            logging.debug("InferTopics call finished.")
-
-            if (
-                logging.getLogger().getEffectiveLevel() != logging.DEBUG
-                and delete_mallet_file_after
-                and not self.keep_tmp_files
-            ):
-                os.remove(mallet_file)
-                logging.debug("Deleting temporary mallet input file: %s", mallet_file)
-
-        return topics_file
 
     def run_csv2topics(
         self, mallet_file: str, delete_mallet_file_after: bool = True
@@ -137,6 +84,7 @@ class LanguageInferencer:
             )
 
         topics_file = mallet_file + ".doctopics"
+
 
         arguments = [
             "--input",
