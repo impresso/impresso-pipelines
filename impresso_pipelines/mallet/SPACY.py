@@ -66,7 +66,8 @@ class SPACY:
 
         # Check if the model is already cached
         if os.path.exists(cached_model_path):
-            print(f"Using cached SpaCy model from: {cached_model_path}")
+            # print(f"Using cached SpaCy model from: {cached_model_path}")
+            print(f"Using cached SpaCy model...")
         else:
             # Download the tar file
             print(f"Downloading SpaCy model from: {model_url}...")
@@ -78,7 +79,7 @@ class SPACY:
 
         # Extract the tar file to a temporary directory
         temp_dir = tempfile.mkdtemp()
-        print(f"Extracting SpaCy model to: {temp_dir}...")
+        # print(f"Extracting SpaCy model to: {temp_dir}...")
         with tarfile.open(cached_model_path, "r:gz") as tar:
             tar.extractall(path=temp_dir)
 

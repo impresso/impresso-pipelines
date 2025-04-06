@@ -36,7 +36,7 @@ class MalletVectorizer:
         self.output_file = os.path.join(os.path.dirname(__file__), output_file)  # Save in the same folder
         self.keep_tmp_file = keep_tmp_file
 
-    def __call__(self, lemmatized_words: List[str]) -> str:
+    def __call__(self, lemmatized_words: List[str], doc_counter) -> str:
         """
         Processes a given list of lemmatized words, vectorizing it using Mallet and returns the output file path.
 
@@ -52,7 +52,7 @@ class MalletVectorizer:
         )
         with open(temp_input_file.name, "w", encoding="utf-8") as temp_file:
             # temp_file.write("id\tclass\ttext\n")
-            temp_file.write(f"1\tdummy\t{' '.join(lemmatized_words)}\n")
+            temp_file.write(f"doc{doc_counter}\tdummy\t{' '.join(lemmatized_words)}\n")
             # temp_file.write(f"USERINPUT-001\tdummy\t{' '.join(lemmatized_words)}\n")
 
 

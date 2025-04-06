@@ -22,6 +22,7 @@ class MalletPipeline:
         self.temp_dir = tempfile.mkdtemp(prefix="mallet_models_")  # Create temp folder for models
         self.temp_output_file = None  # Placeholder for temporary output file
         self.latest_model = None
+        self.doc_counter = 0
 
         # Start JVM if not already running
         if not jpype.isJVMStarted():
@@ -92,7 +93,7 @@ class MalletPipeline:
         for entry in output:
             entry["topic_model_description"] = TOPIC_MODEL_DESCRIPTIONS[self.language]
             
-
+        self.doc_counter += 1  # Increment the document counter for the next call
         return output  # Returns clean lemmatized text without punctuation
     
     def find_latest_model_version(self):
@@ -145,7 +146,7 @@ class MalletPipeline:
 
         
         mallet = MalletVectorizer(pipe_file, output_file)
-        mallet(text)
+        mallet(text, self.doc_counter)
 
     def mallet_inferencer(self):
         lang = self.language  # adjusting calling based on language
