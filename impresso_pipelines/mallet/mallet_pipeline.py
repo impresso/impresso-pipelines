@@ -56,7 +56,7 @@ class MalletPipeline:
         return os.path.dirname(jar_paths[0])
 
 
-    def __call__(self, text, language=None, output_file=None):
+    def __call__(self, text, language=None, output_file=None, doc_name = None):
         if output_file is None:
             self.temp_output_file = tempfile.NamedTemporaryFile(
                 prefix="tmp_output_", suffix=".mallet", dir=self.temp_dir, delete=False
@@ -81,7 +81,7 @@ class MalletPipeline:
         lemma_text = self.SPACY(text)
 
         # PART 3: Vectorization using Mallet
-        self.vectorizer_mallet(lemma_text, self.output_file)
+        self.vectorizer_mallet(lemma_text, self.output_file, doc_name)
 
         # PART 4: Mallet inferencer and JSONification
         self.mallet_inferencer()
@@ -92,8 +92,9 @@ class MalletPipeline:
         # for each entry in the output list, add key "topic_model_description" with the value from the config file for the language
         for entry in output:
             entry["topic_model_description"] = TOPIC_MODEL_DESCRIPTIONS[self.language]
-            
-        self.doc_counter += 1  # Increment the document counter for the next call
+        
+        if doc_name is None:
+            self.doc_counter += 1  # Increment the document counter for the next call
         return output  # Returns clean lemmatized text without punctuation
     
     def find_latest_model_version(self):
@@ -133,7 +134,7 @@ class MalletPipeline:
         nlp = SPACY(model_id, self.language, self.latest_model)
         return nlp(text)
 
-    def vectorizer_mallet(self, text, output_file):
+    def vectorizer_mallet(self, text, output_file, doc_name):
         from impresso_pipelines.mallet.mallet_vectorizer_changed import MalletVectorizer  # Lazy import
 
 
@@ -146,7 +147,10 @@ class MalletPipeline:
 
         
         mallet = MalletVectorizer(pipe_file, output_file)
-        mallet(text, self.doc_counter)
+        if doc_name is not None:
+            mallet(text, doc_name)
+        else:
+            mallet(text, f"doc{self.doc_counter}")
 
     def mallet_inferencer(self):
         lang = self.language  # adjusting calling based on language
