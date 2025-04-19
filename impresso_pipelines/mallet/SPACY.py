@@ -120,13 +120,22 @@ class SPACY:
     def map_tag_to_pos(self, tag):
         # Map the fine-grained tags used by your Luxembourgish model to Universal POS tags
         tag_map = {
-            "N": "NOUN",
-            "V": "VERB",
+            "$": "PUNCT",
             "ADJ": "ADJ",
-            "P": "PRON",
             "AV": "ADV",
+            "APPR": "ADP",
+            "APPRART": "ADP",
             "D": "DET",
-            "KO": "CCONJ",
+            "KO": "CONJ",
+            "N": "NOUN",
+            "P": "ADV",
+            "TRUNC": "X",
+            "AUX": "AUX",
+            "V": "VERB",
+            "MV": "VERB",
             "PTK": "PART",
+            "INTER": "PART",
+            "NUM": "NUM",
+            "_SP": "SPACE",
         }
         return tag_map.get(tag, "")
