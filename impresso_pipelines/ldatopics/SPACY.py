@@ -12,7 +12,7 @@ from huggingface_hub import hf_hub_download
 class SPACY:
     def __init__(self, model_id, language, latest_version):
         # load spcay file
-        from impresso_pipelines.mallet.config import MODEL_URLS  # Lazy import
+        from impresso_pipelines.ldatopics.config import MODEL_URLS  # Lazy import
         model_url = MODEL_URLS[model_id]
         if not model_url:
             raise ValueError(f"No SpaCy model available for {model_id}")

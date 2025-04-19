@@ -37,16 +37,16 @@ import tempfile
 
 from typing import List, Dict, Generator, Optional, Set, Iterable, Any
 
-import impresso_pipelines.mallet.language_inferencer as language_inferencer
+import impresso_pipelines.ldatopics.language_inferencer as language_inferencer
 # Remove direct imports to avoid circular dependencies
 # import impresso_pipelines.mallet.s3_to_local_stamps
 # import impresso_pipelines.mallet.mallet2topic_assignment_jsonl as m2taj
 from smart_open import open
 
 
-from impresso_pipelines.mallet.language_inferencer import LanguageInferencer
+from impresso_pipelines.ldatopics.language_inferencer import LanguageInferencer
 
-from impresso_pipelines.mallet.input_reader import (
+from impresso_pipelines.ldatopics.input_reader import (
     InputReader,
     JsonlInputReader,
     CsvInputReader,
@@ -116,7 +116,7 @@ class MalletTopicInferencer:
         self.initialize()
 
         # Initialize S3 client if input or language file is in S3
-        from impresso_pipelines.mallet.s3_to_local_stamps import get_s3_client, s3_file_exists  # Lazy import
+        from impresso_pipelines.ldatopics.s3_to_local_stamps import get_s3_client, s3_file_exists  # Lazy import
         self.S3_CLIENT = (
             get_s3_client()
             if self.args.input.startswith("s3://")
@@ -346,7 +346,7 @@ class MalletTopicInferencer:
         return language_lemmatizations
 
     def init_ma2ta_converters(self, args: argparse.Namespace) -> Dict[str, Generator]:
-        from impresso_pipelines.mallet.mallet2topic_assignment_jsonl import Mallet2TopicAssignment  # Lazy import
+        from impresso_pipelines.ldatopics.mallet2topic_assignment_jsonl import Mallet2TopicAssignment  # Lazy import
 
         """
         Build a mapping of languages to their respective Mallet2TopicAssignment
@@ -624,7 +624,7 @@ class MalletTopicInferencer:
                 args.extend(["--git-version", self.args.git_version])
             if self.args.impresso_model_id:
                 args.extend(["--impresso-model-id", self.args.impresso_model_id])
-            from impresso_pipelines.mallet.mallet2topic_assignment_jsonl import Mallet2TopicAssignment  # Lazy import
+            from impresso_pipelines.ldatopics.mallet2topic_assignment_jsonl import Mallet2TopicAssignment  # Lazy import
             m2ta_converters[lang] = Mallet2TopicAssignment.main(args).run()
 
         with open(self.args.output, "w", encoding="utf-8") as out_f:

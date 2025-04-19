@@ -1,5 +1,5 @@
 
-from impresso_pipelines.mallet.mallet_pipeline import MalletPipeline
+from impresso_pipelines.ldatopics.mallet_pipeline import MalletPipeline
 
 
 
