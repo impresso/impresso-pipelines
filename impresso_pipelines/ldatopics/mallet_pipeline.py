@@ -17,7 +17,7 @@ except ImportError:
 
 
 
-class MalletPipeline:
+class LDATopicsPipeline:
     def __init__(self):
         self.temp_dir = tempfile.mkdtemp(prefix="mallet_models_")  # Create temp folder for models
         self.temp_output_file = None  # Placeholder for temporary output file

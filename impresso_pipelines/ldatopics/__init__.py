@@ -8,7 +8,7 @@ try:
     import dotenv
 
 
-    from .mallet_pipeline import MalletPipeline
+    from .mallet_pipeline import LDATopicsPipeline
 except ImportError:
     raise ImportError(
         "The mallet subpackage requires additional dependencies. "
