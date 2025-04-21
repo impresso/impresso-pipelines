@@ -1,12 +1,12 @@
 
-from impresso_pipelines.mallet.mallet_pipeline import MalletPipeline
+from impresso_pipelines.ldatopics.mallet_pipeline import LDATopicsPipeline
 
 
 
 text = "Die Katzen spielten fröhlich im Garten, während die Vögel sangen."
 text_fr = "Les chats jouaient joyeusement dans le jardin pendant que les oiseaux chantaient."
 text_lb = "Katzen hunn am Gaart gespillt, während Villercher gesongen hunn."
-mallet = MalletPipeline()
+mallet = LDATopicsPipeline()
 print(mallet(text, doc_name = "my_doc"))
 # print empty line
 print()

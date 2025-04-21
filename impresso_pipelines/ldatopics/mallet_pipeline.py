@@ -1,5 +1,5 @@
 from impresso_pipelines.langident.langident_pipeline import LangIdentPipeline
-from impresso_pipelines.mallet.mallet_topic_inferencer import MalletTopicInferencer
+from impresso_pipelines.ldatopics.mallet_topic_inferencer import MalletTopicInferencer
 import argparse
 import json
 import os
@@ -17,7 +17,7 @@ except ImportError:
 
 
 
-class MalletPipeline:
+class LDATopicsPipeline:
     def __init__(self):
         self.temp_dir = tempfile.mkdtemp(prefix="mallet_models_")  # Create temp folder for models
         self.temp_output_file = None  # Placeholder for temporary output file
@@ -70,7 +70,7 @@ class MalletPipeline:
         if self.language is None:
             self.language_detection(text)
 
-        from impresso_pipelines.mallet.config import SUPPORTED_LANGUAGES, TOPIC_MODEL_DESCRIPTIONS  # Lazy import
+        from impresso_pipelines.ldatopics.config import SUPPORTED_LANGUAGES, TOPIC_MODEL_DESCRIPTIONS  # Lazy import
         if self.language not in SUPPORTED_LANGUAGES:
             raise ValueError(f"Unsupported language: {self.language}. Supported languages are: {SUPPORTED_LANGUAGES.keys()}")
 
@@ -124,8 +124,8 @@ class MalletPipeline:
     
     def SPACY(self, text):
         """Uses the appropriate SpaCy model based on language"""
-        from impresso_pipelines.mallet.SPACY import SPACY  # Lazy import
-        from impresso_pipelines.mallet.config import SUPPORTED_LANGUAGES  # Lazy import
+        from impresso_pipelines.ldatopics.SPACY import SPACY  # Lazy import
+        from impresso_pipelines.ldatopics.config import SUPPORTED_LANGUAGES  # Lazy import
 
         model_id = SUPPORTED_LANGUAGES[self.language]
         if not model_id:
@@ -135,7 +135,7 @@ class MalletPipeline:
         return nlp(text)
 
     def vectorizer_mallet(self, text, output_file, doc_name):
-        from impresso_pipelines.mallet.mallet_vectorizer_changed import MalletVectorizer  # Lazy import
+        from impresso_pipelines.ldatopics.mallet_vectorizer_changed import MalletVectorizer  # Lazy import
 
 
         # Load the Mallet pipeline
