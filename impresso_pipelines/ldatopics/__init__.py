@@ -12,5 +12,5 @@ try:
 except ImportError:
     raise ImportError(
         "The mallet subpackage requires additional dependencies. "
-        "Please install them with: pip install 'impresso-pipelines[mallet]'"
+        "Please install them with: pip install 'impresso-pipelines[ldatopics]'"
     )
