@@ -56,14 +56,13 @@ class LDATopicsPipeline:
         return os.path.dirname(jar_paths[0])
 
 
-    def __call__(self, text, language=None, output_file=None, doc_name = None):
-        if output_file is None:
-            self.temp_output_file = tempfile.NamedTemporaryFile(
-                prefix="tmp_output_", suffix=".mallet", dir=self.temp_dir, delete=False
-            )
-            self.output_file = self.temp_output_file.name
-        else:
-            self.output_file = output_file
+    def __call__(self, text, language=None, doc_name = None):
+       
+        self.temp_output_file = tempfile.NamedTemporaryFile(
+            prefix="tmp_output_", suffix=".mallet", dir=self.temp_dir, delete=False
+        )
+        self.output_file = self.temp_output_file.name
+       
 
         # PART 1: Language Identification
         self.language = language
