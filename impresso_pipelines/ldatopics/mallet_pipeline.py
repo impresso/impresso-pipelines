@@ -4,7 +4,7 @@ import argparse
 import json
 import os
 import bz2
-from huggingface_hub import hf_hub_url, hf_hub_download, list_repo_files  # Add list_repo_files import
+from huggingface_hub import hf_hub_download, list_repo_files  # Add list_repo_files import
 import tempfile  # Add import for temporary directory
 import shutil  # Add import for removing directories
 import subprocess

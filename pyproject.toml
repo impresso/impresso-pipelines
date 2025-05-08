@@ -26,9 +26,9 @@ homepage = "https://github.com/impresso/impresso-pipelines"
 
 [tool.poetry.extras]
 langident = ["huggingface_hub", "floret"]
-ocrqa = ["pybloomfiltermmap3", "huggingface_hub", "floret", "transformers"]
-ldatopics = ["pybloomfiltermmap3", "huggingface_hub", "floret", "transformers", "jpype1", "smart_open", "boto3", "python-dotenv", "spacy"]
-all = ["pybloomfiltermmap3", "huggingface_hub", "floret", "transformers", "jpype1", "smart_open", "boto3", "python-dotenv", "spacy"]
+ocrqa = ["pybloomfiltermmap3", "huggingface_hub", "floret"]
+ldatopics = ["pybloomfiltermmap3", "huggingface_hub", "floret", "jpype1", "smart_open", "boto3", "python-dotenv", "spacy"]
+all = ["pybloomfiltermmap3", "huggingface_hub", "floret", "jpype1", "smart_open", "boto3", "python-dotenv", "spacy"]
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.2"
