@@ -3,7 +3,8 @@ from impresso_pipelines.ldatopics.mallet_topic_inferencer import MalletTopicInfe
 import argparse
 import json
 import os
-from huggingface_hub import hf_hub_url, hf_hub_download, list_repo_files  # Add list_repo_files import
+import bz2
+from huggingface_hub import hf_hub_download, list_repo_files  # Add list_repo_files import
 import tempfile  # Add import for temporary directory
 import shutil  # Add import for removing directories
 import subprocess
@@ -56,7 +57,10 @@ class LDATopicsPipeline:
         return os.path.dirname(jar_paths[0])
 
 
-    def __call__(self, text, language=None, doc_name = None):
+    def __call__(self, text, language=None, doc_name = None, diagnostics_lemmatization=False, diagnostics_topics=False, min_p=0.02):
+        self.min_p = min_p
+        if self.min_p < 0.02:
+            raise ValueError("min_p must be at least 0.02")
        
         self.temp_output_file = tempfile.NamedTemporaryFile(
             prefix="tmp_output_", suffix=".mallet", dir=self.temp_dir, delete=False
@@ -91,6 +95,17 @@ class LDATopicsPipeline:
         # for each entry in the output list, add key "topic_model_description" with the value from the config file for the language
         for entry in output:
             entry["topic_model_description"] = TOPIC_MODEL_DESCRIPTIONS[self.language]
+        
+        # rename the key "lg" to "language" in the output list
+        output = [self.rename_key_preserve_position(entry, 'lg', 'language') for entry in output]
+            
+        # for each entry in output, if diagnostics_lemmatization is True, add the key "diagnostics_lemmatization" with the value of lemma_text
+        if diagnostics_lemmatization:
+            for entry in output:
+                entry["diagnostics_lemmatization"] = lemma_text
+        
+        if diagnostics_topics:
+            output = self.add_topic_words_to_output(output)
         
         if doc_name is None:
             self.doc_counter += 1  # Increment the document counter for the next call
@@ -179,7 +194,7 @@ class LDATopicsPipeline:
                 f"{lang}_model_id": f"tm-{lang}-all-v{self.latest_model}",
                 f"{lang}_topic_count": 20
             },
-            min_p=0.02,
+            min_p=self.min_p,
             keep_tmp_files=False,
             include_lid_path=False,
             inferencer_random_seed=42,
@@ -224,3 +239,68 @@ class LDATopicsPipeline:
         os.remove(filepath)
 
         return data
+
+    def add_topic_words_to_output(self, output):
+        from impresso_pipelines.ldatopics.config import TOPIC_MODEL_DESCRIPTIONS_HF
+
+         # If the pipeline returned a list of docs, recurse into each one
+        if isinstance(output, list):
+            return [self.add_topic_words_to_output(item) for item in output]
+
+        # 1) Lookup repo_id & filename from your config
+        try:
+            repo_id, hf_filename = TOPIC_MODEL_DESCRIPTIONS_HF[self.language]
+        except KeyError:
+            raise ValueError(f"No HF topic‐description entry for language '{self.language}'")
+
+        # 2) Download the compressed .jsonl.bz2 from HF
+        compressed = hf_hub_download(repo_id=repo_id, filename=hf_filename)
+
+        # 3) Unpack into a temp folder
+        temp_dir = tempfile.mkdtemp(prefix="topic_desc_")
+        try:
+            jsonl_path = os.path.join(temp_dir, "topic_model_descriptions.jsonl")
+            with bz2.open(compressed, "rb") as f_in, open(jsonl_path, "wb") as f_out:
+                shutil.copyfileobj(f_in, f_out)
+
+            # 4) Build a map: full_topic_id → top-10 words
+            topic_to_words = {}
+            with open(jsonl_path, "r", encoding="utf-8") as fin:
+                for line in fin:
+                    data = json.loads(line)
+                    # use the JSONL's `id` field, which matches your output['topics'][*]['t']
+                    full_id = data["id"]
+                    word_probs = data.get("word_probs", [])
+                    # sort by prob desc, take the first 10 words
+                    top10 = [
+                        wp["word"]
+                        for wp in sorted(word_probs, key=lambda x: x.get("prob", 0), reverse=True)[:10]
+                    ]
+                    topic_to_words[full_id] = top10
+
+            # 5) Stitch into output
+            diagnostics = {}
+            for t in output.get("topics", []):
+                key = t.get("t") or t.get("topic_model")
+                diagnostics[key] = topic_to_words.get(key, [])
+
+            output["diagnostics_topics"] = diagnostics
+
+        finally:
+            shutil.rmtree(temp_dir)
+
+        return output
+
+
+    def rename_key_preserve_position(self, d: dict, old_key: str, new_key: str) -> dict:
+        """
+        Return a new dict where old_key has been renamed to new_key,
+        but all other keys remain in their original order.
+        """
+        new_d = {}
+        for k, v in d.items():
+            if k == old_key:
+                new_d[new_key] = v
+            else:
+                new_d[k] = v
+        return new_d
