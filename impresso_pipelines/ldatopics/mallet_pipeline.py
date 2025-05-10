@@ -98,6 +98,9 @@ class LDATopicsPipeline:
         
         # rename the key "lg" to "language" in the output list
         output = [self.rename_key_preserve_position(entry, 'lg', 'language') for entry in output]
+        
+        # rename the key "ci_id" to "uid" in the output list, preserving the original key order
+        output = [self.rename_key_preserve_position(entry, 'ci_id', 'uid') for entry in output]
             
         # for each entry in output, if diagnostics_lemmatization is True, add the key "diagnostics_lemmatization" with the value of lemma_text
         if diagnostics_lemmatization:
