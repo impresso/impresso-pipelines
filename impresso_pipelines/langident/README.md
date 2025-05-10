@@ -17,3 +17,6 @@ print(result)
 {'language': 'de', 'score': 1.0}
 ```
 Score represents the probability of the detected language based on the input text.
+
+
+For a more details about the usage and the possibilities that this pipeline provides, please check out our demo [notebook](https://github.com/impresso/impresso-datalab-notebooks/blob/main/annotate/langident_pipeline_demo.ipynb). 

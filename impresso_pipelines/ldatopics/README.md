@@ -51,5 +51,39 @@ MALLET applies **topic modeling**, typically using **Latent Dirichlet Allocation
 The topic modeling results are formatted into **JSON output**. This output is likely structured with **topic distributions, keywords, and document-topic probabilities**, making it easier to use for downstream applications.
 
 
-## LDATopics Example
+## LDA Topics Example
 Make sure you have installed the package as demostrated in the main README. 
+
+```python
+# Initialize the pipeline
+ldatopics_pipeline = LDATopicsPipeline()
+
+# Example text extracted from OCR
+de_text = "Ein kleiner Hund namens Max lebte in einem ruhigen Dorf. Jeden Tag rannte er durch die Straßen und spielte mit den Kindern. Eines Tages fand er einen geheimen Garten, den niemand kannte. Max entschied sich, den Garten zu erkunden und entdeckte viele schöne Blumen und Tiere. Von diesem Tag an besuchte er den Garten jeden Nachmittag."
+     
+
+# Get an answer
+result = ldatopics_pipeline(de_text)
+print(result)
+```
+**Expected Output:**
+```
+[{'uid': 'doc3',
+  'ts': '2025-05-10T10:42:12Z',
+  'language': 'de',
+  'topic_count': 100,
+  'topics': [{'t': 'tm-de-all-v2.0_tp87_de', 'p': 0.202},
+   {'t': 'tm-de-all-v2.0_tp33_de', 'p': 0.108},
+   {'t': 'tm-de-all-v2.0_tp30_de', 'p': 0.097},
+   {'t': 'tm-de-all-v2.0_tp65_de', 'p': 0.064},
+   {'t': 'tm-de-all-v2.0_tp59_de', 'p': 0.052},
+   {'t': 'tm-de-all-v2.0_tp80_de', 'p': 0.052},
+   {'t': 'tm-de-all-v2.0_tp02_de', 'p': 0.03},
+   {'t': 'tm-de-all-v2.0_tp31_de', 'p': 0.03},
+   {'t': 'tm-de-all-v2.0_tp66_de', 'p': 0.03}],
+  'min_p': 0.02,
+  'topic_model_id': 'tm-de-all-v2.0',
+  'topic_model_description': 'https://huggingface.co/impresso-project/mallet-topic-inferencer/resolve/main/models/tm/tm-de-all-v2.0.topic_model_topic_description.jsonl.bz2'}]
+```
+
+For a more details about the usage and the possibilities that this pipeline provides, please check out our demo [notebook](https://github.com/impresso/impresso-datalab-notebooks/blob/main/annotate/ldatopics_pipeline_demo.ipynb). 

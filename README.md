@@ -22,7 +22,7 @@ If you want to install only the OCR QA pipeline, use:
 ```bash
 pip install impresso_pipelines[ocrqa]
 ```
-If you want to install only the LDATopics pipeline, use:
+If you want to install only the LDA Topics pipeline, use:
 ```bash
 pip install impresso_pipelines[ldatopics]
 ```
@@ -39,7 +39,7 @@ from impresso_pipelines.ldatopics import LDATopicsPipeline
 For examples of how to run each of the pipelines please refer to the individual README files:
 
 - [Langident Pipleine](./impresso_pipelines/langident/README.md)
-- [OCRQA Pipeline](./impresso_pipelines/ocrqa/README.md)
+- [OCR QA Pipeline](./impresso_pipelines/ocrqa/README.md)
 - [LDA Topics Pipeline](./impresso_pipelines/ldatopics/README.md)
 
 

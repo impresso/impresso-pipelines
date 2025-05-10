@@ -17,3 +17,5 @@ print(result)
 {'language': 'de', 'score': 1.0}
 ```
 Score roughly represents the ratio between known and unknown words in the text in comparison to the language-specific Bloom filter database.
+
+For a more details about the usage and the possibilities that this pipeline provides, please check out our demo [notebook](https://github.com/impresso/impresso-datalab-notebooks/blob/main/annotate/ocrqa_pipeline_demo.ipynb). 
