@@ -325,7 +325,7 @@ class NERLongPipeline():
     def __init__(self):
         pass
 
-    def __call__(self, model_id: str, input_text: str, min_score: float, suppress_entities: Optional[Sequence[str]] = None):
+    def __call__(self, input_text, min_score, model_id="impresso-project/ner-newsagency-bert-multilingual", suppress_entities: Optional[Sequence[str]] = None):
         """
         Run the NER pipeline programmatically.
 
