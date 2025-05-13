@@ -110,6 +110,12 @@ class LDATopicsPipeline:
         if diagnostics_topics:
             output = self.add_topic_words_to_output(output)
         
+        # Rename 'p' to 'relevance' in the topics list
+        for entry in output:
+            if "topics" in entry:
+                for topic in entry["topics"]:
+                    topic["relevance"] = topic.pop("p", None)
+
         if doc_name is None:
             self.doc_counter += 1  # Increment the document counter for the next call
         return output  # Returns clean lemmatized text without punctuation
