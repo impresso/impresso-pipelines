@@ -57,8 +57,8 @@ class LDATopicsPipeline:
         return os.path.dirname(jar_paths[0])
 
 
-    def __call__(self, text, language=None, doc_name = None, diagnostics_lemmatization=False, diagnostics_topics=False, min_p=0.02):
-        self.min_p = min_p
+    def __call__(self, text, language=None, doc_name = None, diagnostics_lemmatization=False, diagnostics_topics=False, min_relevance=0.02):
+        self.min_p = min_relevance
         if self.min_p < 0.02:
             raise ValueError("min_p must be at least 0.02")
        
@@ -92,6 +92,9 @@ class LDATopicsPipeline:
         # PART 5: Return the JSON output
         output = self.json_output(filepath=os.path.join(self.temp_dir, "tmp_output.jsonl"))
 
+
+        # SOME RENAMINGS AND ADDITIONS _____________________________________________________
+
         # for each entry in the output list, add key "topic_model_description" with the value from the config file for the language
         for entry in output:
             entry["topic_model_description"] = TOPIC_MODEL_DESCRIPTIONS[self.language]
@@ -101,6 +104,9 @@ class LDATopicsPipeline:
         
         # rename the key "ci_id" to "uid" in the output list, preserving the original key order
         output = [self.rename_key_preserve_position(entry, 'ci_id', 'uid') for entry in output]
+
+        # rename the key "min_p" to "min_relevance" in the output list, preserving the original key order
+        output = [self.rename_key_preserve_position(entry, 'min_p', 'min_relevance') for entry in output]
             
         # for each entry in output, if diagnostics_lemmatization is True, add the key "diagnostics_lemmatization" with the value of lemma_text
         if diagnostics_lemmatization:
@@ -110,6 +116,15 @@ class LDATopicsPipeline:
         if diagnostics_topics:
             output = self.add_topic_words_to_output(output)
         
+        # Rename 'p' to 'relevance' in the topics list
+        for entry in output:
+            if "topics" in entry:
+                for topic in entry["topics"]:
+                    topic["relevance"] = topic.pop("p", None)
+
+
+        # ____________________________________________________________
+
         if doc_name is None:
             self.doc_counter += 1  # Increment the document counter for the next call
         return output  # Returns clean lemmatized text without punctuation
