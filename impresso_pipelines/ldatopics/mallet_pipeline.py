@@ -57,8 +57,8 @@ class LDATopicsPipeline:
         return os.path.dirname(jar_paths[0])
 
 
-    def __call__(self, text, language=None, doc_name = None, diagnostics_lemmatization=False, diagnostics_topics=False, min_p=0.02):
-        self.min_p = min_p
+    def __call__(self, text, language=None, doc_name = None, diagnostics_lemmatization=False, diagnostics_topics=False, min_relevance=0.02):
+        self.min_p = min_relevance
         if self.min_p < 0.02:
             raise ValueError("min_p must be at least 0.02")
        

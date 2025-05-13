@@ -18,12 +18,12 @@ def test_basics():
     # assert that first and only element of the list is a dictionary
     assert isinstance(result[0], dict)
     
-    # assert that dictionary has keys 'uid', 'ts', 'language', 'topics', 'min_p', 'topic_model_id', 'topic_model_description'
+    # assert that dictionary has keys 'uid', 'ts', 'language', 'topics', 'min_relevance', 'topic_model_id', 'topic_model_description'
     assert 'uid' in result[0].keys()
     assert 'ts' in result[0].keys()
     assert 'language' in result[0].keys()
     assert 'topics' in result[0].keys()
-    assert 'min_p' in result[0].keys()
+    assert 'min_relevance' in result[0].keys()
     assert 'topic_model_id' in result[0].keys()
     assert 'topic_model_description' in result[0].keys()
 
@@ -40,8 +40,8 @@ def test_basics():
     assert isinstance(result[0]['topics'], list)
     assert isinstance(result[0]['topics'][0], dict)
 
-    # assert that 'min_p' is a float
-    assert isinstance(result[0]['min_p'], float)
+    # assert that 'min_relevance' is a float
+    assert isinstance(result[0]['min_relevance'], float)
 
     # assert that 'topic_model_id' is a string
     assert isinstance(result[0]['topic_model_id'], str)
@@ -91,10 +91,10 @@ def test_min_p():
         s’assoient sur les bancs pour discuter de la pluie et du beau temps. Ici, tout
         le monde se connaît, et l’entraide fait partie du quotidien."""
     
-    result = lda_pipeline(text, min_p=0.5)
+    result = lda_pipeline(text, min_relevance=0.5)
 
-    # assert that min_p is 0.5
-    assert result[0]['min_p'] == 0.5
+    # assert that min_relevance is 0.5
+    assert result[0]['min_relevance'] == 0.5
 
 
 def test_diagnostics_lemmatization():
@@ -114,12 +114,12 @@ def test_diagnostics_lemmatization():
     # assert that first and only element of the list is a dictionary
     assert isinstance(result[0], dict)
     
-    # assert that dictionary has keys 'uid', 'ts', 'language', 'topics', 'min_p', 'topic_model_id', 'topic_model_description', 'diagnostics_lemmatization'
+    # assert that dictionary has keys 'uid', 'ts', 'language', 'topics', 'min_relevance', 'topic_model_id', 'topic_model_description', 'diagnostics_lemmatization'
     assert 'uid' in result[0].keys()
     assert 'ts' in result[0].keys()
     assert 'language' in result[0].keys()
     assert 'topics' in result[0].keys()
-    assert 'min_p' in result[0].keys()
+    assert 'min_relevance' in result[0].keys()
     assert 'topic_model_id' in result[0].keys()
     assert 'topic_model_description' in result[0].keys()
     assert 'diagnostics_lemmatization' in result[0].keys()
@@ -137,8 +137,8 @@ def test_diagnostics_lemmatization():
     assert isinstance(result[0]['topics'], list)
     assert isinstance(result[0]['topics'][0], dict)
 
-    # assert that 'min_p' is a float
-    assert isinstance(result[0]['min_p'], float)
+    # assert that 'min_relevance' is a float
+    assert isinstance(result[0]['min_relevance'], float)
 
     # assert that 'topic_model_id' is a string
     assert isinstance(result[0]['topic_model_id'], str)
@@ -167,12 +167,12 @@ def test_diagnostics_topics():
     # assert that first and only element of the list is a dictionary
     assert isinstance(result[0], dict)
     
-    # assert that dictionary has keys 'uid', 'ts', 'language', 'topics', 'min_p', 'topic_model_id', 'topic_model_description', 'diagnostics_topics'
+    # assert that dictionary has keys 'uid', 'ts', 'language', 'topics', 'min_relevance', 'topic_model_id', 'topic_model_description', 'diagnostics_topics'
     assert 'uid' in result[0].keys()
     assert 'ts' in result[0].keys()
     assert 'language' in result[0].keys()
     assert 'topics' in result[0].keys()
-    assert 'min_p' in result[0].keys()
+    assert 'min_relevance' in result[0].keys()
     assert 'topic_model_id' in result[0].keys()
     assert 'topic_model_description' in result[0].keys()
     assert 'diagnostics_topics' in result[0].keys()
@@ -190,8 +190,8 @@ def test_diagnostics_topics():
     assert isinstance(result[0]['topics'], list)
     assert isinstance(result[0]['topics'][0], dict)
 
-    # assert that 'min_p' is a float
-    assert isinstance(result[0]['min_p'], float)
+    # assert that 'min_relevance' is a float
+    assert isinstance(result[0]['min_relevance'], float)
 
     # assert that 'topic_model_id' is a string
     assert isinstance(result[0]['topic_model_id'], str)
@@ -212,7 +212,7 @@ def test_all_at_once():
         s’assoient sur les bancs pour discuter de la pluie et du beau temps. Ici, tout
         le monde se connaît, et l’entraide fait partie du quotidien."""
     
-    result = lda_pipeline(text, language='lb', doc_name='test_name', min_p=0.05, diagnostics_lemmatization=True, diagnostics_topics=True)
+    result = lda_pipeline(text, language='lb', doc_name='test_name', min_relevance=0.05, diagnostics_lemmatization=True, diagnostics_topics=True)
 
     # assert that the pipeline returns a list
     assert isinstance(result, list)
@@ -220,12 +220,12 @@ def test_all_at_once():
     # assert that first and only element of the list is a dictionary
     assert isinstance(result[0], dict)
     
-    # assert that dictionary has keys 'uid', 'ts', 'language', 'topics', 'min_p', 'topic_model_id', 'topic_model_description', 'diagnostics_lemmatization', 'diagnostics_topics'
+    # assert that dictionary has keys 'uid', 'ts', 'language', 'topics', 'min_relevance', 'topic_model_id', 'topic_model_description', 'diagnostics_lemmatization', 'diagnostics_topics'
     assert 'uid' in result[0].keys()
     assert 'ts' in result[0].keys()
     assert 'language' in result[0].keys()
     assert 'topics' in result[0].keys()
-    assert 'min_p' in result[0].keys()
+    assert 'min_relevance' in result[0].keys()
     assert 'topic_model_id' in result[0].keys()
     assert 'topic_model_description' in result[0].keys()
     assert 'diagnostics_lemmatization' in result[0].keys()
@@ -244,8 +244,8 @@ def test_all_at_once():
     assert isinstance(result[0]['topics'], list)
     assert isinstance(result[0]['topics'][0], dict)
 
-    # assert that 'min_p' is a float
-    assert isinstance(result[0]['min_p'], float)
+    # assert that 'min_relevance' is a float
+    assert isinstance(result[0]['min_relevance'], float)
 
     # assert that 'topic_model_id'
     assert isinstance(result[0]['topic_model_id'], str)
@@ -265,6 +265,6 @@ def test_all_at_once():
     # assert that 'uid' is 'test_name'
     assert result[0]['uid'] == 'test_name'
 
-    # assert that 'min_p' is 0.05
-    assert result[0]['min_p'] == 0.05
+    # assert that 'min_relevance' is 0.05
+    assert result[0]['min_relevance'] == 0.05
 
