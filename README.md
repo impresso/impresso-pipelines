@@ -3,28 +3,23 @@
 ## Overview
 This repository contains a Python package designed for efficient and modular processing. Currently, it includes the following subpackages:
 
-- **Language Identification Pipeline**: Pipeline that automatically detects the language of input text and provides its corresponding probability score.
-- **OCR QA Pipeline**: Pipeline that evaluates the quality of OCR-processed text by calculating a score (0-1) representing the proportion of recognized words in the input text against a language-specific Bloom filter database.
-- **LDA Topics Pipeline**: Pipeline that using topic modelling assigns the most relevant topics to the input text. 
+- **Language Identification Pipeline**: Detects the language of input text and provides a corresponding probability score.
+- **OCR QA Pipeline**: Evaluates the quality of OCR-processed text by calculating a score (0-1) representing the proportion of recognized words in the input text using a language-specific, efficient Bloom filter database.
+- **LDA Topic Modeling Pipeline**: Uses topic modelling to assign the most relevant topics to the input text. 
 
 
 
 ## Installation
-To install the package, use:
+To install the package with all subpackages, use:
 ```bash
 pip install impresso_pipelines[all]
 ```
-If you want to install only the language identification pipeline, use:
+
+To install individual subpackages without any additional dependencies, use:
 ```bash
-pip install impresso_pipelines[langident]
-```
-If you want to install only the OCR QA pipeline, use:
-```bash
-pip install impresso_pipelines[ocrqa]
-```
-If you want to install only the LDA Topics pipeline, use:
-```bash
-pip install impresso_pipelines[ldatopics]
+pip install impresso_pipelines[langident]   # Language Identification
+pip install impresso_pipelines[ocrqa]       # OCR QA
+pip install impresso_pipelines[ldatopics]   # LDA Topics
 ```
 
 ## Usage
@@ -36,19 +31,20 @@ from impresso_pipelines.ldatopics import LDATopicsPipeline
 ```
 
 ## Running the Pipeline examples
-For examples of how to run each of the pipelines please refer to the individual README files:
+For usage examples, refer to the individual README files:
 
-- [Langident Pipleine](./impresso_pipelines/langident/README.md)
-- [OCR QA Pipeline](./impresso_pipelines/ocrqa/README.md)
-- [LDA Topics Pipeline](./impresso_pipelines/ldatopics/README.md)
+ - [Langident Pipeline](./impresso_pipelines/langident/README.md)
+ - [OCR QA Pipeline](./impresso_pipelines/ocrqa/README.md)
+ - [LDA Topics Pipeline](./impresso_pipelines/ldatopics/README.md)
 
 
 
-## More information
-For more examples, please take a look at documentation notebooks [langident_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/langident_pipeline_demo.ipynb) and [ocrqa_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/ocrqa_pipeline_demo.ipynb).
+Additional examples are available in the documentation notebooks:
+ - [langident_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/langident_pipeline_demo.ipynb)
+ - [ocrqa_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/ocrqa_pipeline_demo.ipynb).
 
 ## Future Plans
-More pipelines and subpackages will be added to enhance functionality and broaden use cases. Stay tuned!
+More Impresso functionality (newsagency detection, named entity recognition and linking) will be added to enhance functionality and broaden use cases.
 
 
 ## About Impresso
@@ -59,7 +55,7 @@ More pipelines and subpackages will be added to enhance functionality and broade
 
 ### Copyright
 
-Copyright (C) 2024 The Impresso team.
+Copyright (C) 2025 The Impresso team.
 
 ### License
 
