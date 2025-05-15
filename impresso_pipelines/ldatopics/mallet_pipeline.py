@@ -120,7 +120,9 @@ class LDATopicsPipeline:
         for entry in output:
             if "topics" in entry:
                 for topic in entry["topics"]:
+                    topic["uid"] = topic.pop("t", None)
                     topic["relevance"] = topic.pop("p", None)
+                    
 
 
         # ____________________________________________________________
