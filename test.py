@@ -50,7 +50,7 @@ Late in the evening, TASS issues a bulletin insisting that existing fuel convent
 """
 
 
-result = pipeline(text, diagnostics=True)
+result = pipeline(text)
 
 print("Result:")
 print(result)

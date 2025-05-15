@@ -342,7 +342,8 @@ class NewsAgenciesPipeline():
         Returns:
             Tuple[List[Dict[str, Any]], Dict[str, float]]: Extracted entities and summary.
         """
-        suppress_entities = suppress_entities or []
+        # suppress_entities = suppress_entities or []
+        suppress_entities = ['org.ent.pressagency.unk', 'ag', 'pers.ind.articleauthor']
         config = AutoConfig.from_pretrained(model_id)
         model = NewsAgencyTokenClassifier.from_pretrained(model_id, config=config)
 
@@ -413,6 +414,9 @@ class NewsAgenciesPipeline():
 
         # sort merged by relevance
         merged.sort(key=lambda x: x["relevance"], reverse=True)
+
+        # append original text to merged as a dict with key "text"
+        merged.append({"text": input_text})
 
         if diagnostics:
             return merged
