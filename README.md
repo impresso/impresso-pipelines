@@ -34,8 +34,8 @@ from impresso_pipelines.ldatopics import LDATopicsPipeline
 For usage examples, refer to the individual README files:
 
  - [Langident Pipeline](README_langident.md)
- - [OCR QA Pipeline](./impresso_pipelines/ocrqa/README.md)
- - [LDA Topics Pipeline](./impresso_pipelines/ldatopics/README.md)
+ - [OCR QA Pipeline](README_ocrqa.md)
+ - [LDA Topics Pipeline](README_ldatopics.md)
 
 
 

@@ -11,7 +11,7 @@ text_new = ("Die Katzen spielten fröhlich im Garten,\n\n"
 text_fr = "Les chats jouaient joyeusement dans le jardin pendant que les oiseaux chantaient."
 text_lb = "Katzen hunn am Gaart gespillt, während Villercher gesongen hunn."
 mallet = LDATopicsPipeline()
-print(mallet(text, min_p=0.02))
+print(mallet(text, min_relevance=0.02))
 # print empty line
 print()
 print()
