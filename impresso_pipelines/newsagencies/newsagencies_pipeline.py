@@ -321,11 +321,11 @@ class ChunkAwareTokenClassification(Pipeline):
 
 
 
-class NERLongPipeline():
+class NewsAgenciesPipeline():
     def __init__(self):
         pass
 
-    def __call__(self, input_text, min_score, model_id="impresso-project/ner-newsagency-bert-multilingual", suppress_entities: Optional[Sequence[str]] = None):
+    def __call__(self, input_text, min_relevance=0.1, diagnostics=False, model_id="impresso-project/ner-newsagency-bert-multilingual", suppress_entities: Optional[Sequence[str]] = None):
         """
         Run the NER pipeline programmatically.
 
@@ -358,7 +358,7 @@ class NERLongPipeline():
         ner = ChunkAwareTokenClassification(
             model=model,
             tokenizer=tokenizer,
-            min_score=min_score,
+            min_score=min_relevance,
             device=device,
         )
 
@@ -383,7 +383,7 @@ class NERLongPipeline():
                     "entity": base,
                     "start": tok["start"],
                     "stop": tok["stop"],  # Updated key name
-                    "relevance": tok["score"],
+                    "relevance": round(tok["score"],3),
                 }
 
             elif iob == "I":
@@ -391,6 +391,7 @@ class NERLongPipeline():
                     current["surface"] += f" {tok['word']}"
                     current["stop"] = tok["stop"]  # Updated key name
                     current["relevance"] = max(current["relevance"], tok["score"])
+                    current["relevance"] = round(current["relevance"], 3)
                 else:
                     continue
 
@@ -400,9 +401,22 @@ class NERLongPipeline():
         summary = {}
         for ent in merged:
             summary[ent["entity"]] = max(
-                summary.get(ent["entity"], 0.0), round(ent["relevance"], 2)
+                summary.get(ent["entity"], 0.0), round(ent["relevance"], 3)
             )
+    
+        # trasnform summary into a list of dictionaries
+        sorted_items = sorted(summary.items(), key=lambda item: item[1], reverse=True)
+        summary = [
+            {"uid": uid, "relevance": relevance}
+            for uid, relevance in sorted_items
+        ]
 
-        return merged, summary
+        # sort merged by relevance
+        merged.sort(key=lambda x: x["relevance"], reverse=True)
+
+        if diagnostics:
+            return merged
+        else:
+            return summary
         
 

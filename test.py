@@ -25,9 +25,9 @@
 # # print(mallet(text_lb))
 
 
-from impresso_pipelines.nerlong.nerlong_pipeline import NERLongPipeline
+from impresso_pipelines.newsagencies.newsagencies_pipeline import NewsAgenciesPipeline
 
-pipeline = NERLongPipeline()
+pipeline = NewsAgenciesPipeline()
 
 model_id = "impresso-project/ner-newsagency-bert-multilingual"
 text = """
@@ -46,17 +46,14 @@ By cable to The Times of London, Reuters states that the conference hall fell si
 From New York, United Press International (UPI/UP) recalls that Domei chroniclers followed the Tokyo tariff talks of 1934 „with equal fervour“. Market sheets collated by Extel record a brief rally in overseas securities; yet commentators consulted by Europapress counsel prudence for the Latin exchanges. Warsaw-based PAP intimates that Poland will vote „in concert with Budapest and Prague“. Stockholm’s Tidningarnas Telegrambyrå (TT), meanwhile, relays Nordic caution, whereas Belgrade’s TANJUG cautions against „any settlement that might hamper Balkan exports“.
 Late in the evening, TASS issues a bulletin insisting that existing fuel conventions be honoured; a companion wire from Interfax suggests the Kremlin regards the matter as „no less vital than the grain question of 1917“.
 
+
 """
 
-min_score = 0.01
 
-merged, summary = pipeline(model_id, text, min_score)
+result = pipeline(text, diagnostics=True)
 
-print("Merged:")
-print(merged)
-print()
-print("Summary:")
-print(summary)
+print("Result:")
+print(result)
 
 
 # torch

@@ -4,7 +4,7 @@ try:
    
 
     # Only import this after checking dependencies
-    from .nerlong_pipeline import NERLongPipeline
+    from .newsagencies_pipeline import NewsAgenciesPipeline
 except ImportError:
     raise ImportError(
         "The ocrqa subpackage requires additional dependencies. "

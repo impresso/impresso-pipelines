@@ -27,7 +27,7 @@ homepage = "https://github.com/impresso/impresso-pipelines"
 langident = ["huggingface_hub", "floret"]
 ocrqa = ["pybloomfiltermmap3", "huggingface_hub", "floret"]
 ldatopics = ["pybloomfiltermmap3", "huggingface_hub", "floret", "jpype1", "smart_open", "boto3", "python-dotenv", "spacy"]
-nerlong = ["transformers", "pytorch"]
+newsagencies = ["transformers", "pytorch"]
 all = ["pybloomfiltermmap3", "huggingface_hub", "floret", "jpype1", "smart_open", "boto3", "python-dotenv", "spacy", "transformers", "pytorch"]
 
 [tool.poetry.dev-dependencies]
