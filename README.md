@@ -33,7 +33,7 @@ from impresso_pipelines.ldatopics import LDATopicsPipeline
 ## Running the Pipeline examples
 For usage examples, refer to the individual README files:
 
- - [Langident Pipeline](./impresso_pipelines/langident/README.md)
+ - [Langident Pipeline](README_langident.md)
  - [OCR QA Pipeline](./impresso_pipelines/ocrqa/README.md)
  - [LDA Topics Pipeline](./impresso_pipelines/ldatopics/README.md)
 
