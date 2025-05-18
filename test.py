@@ -1,4 +1,3 @@
-
 # from impresso_pipelines.ldatopics.mallet_pipeline import LDATopicsPipeline
 
 
@@ -43,17 +42,21 @@ Der Deutsche Depeschendienst / dapd (DDP‑DAPD) berichtet von letzter Minute‑
 
 
 By cable to The Times of London, Reuters states that the conference hall fell silent when the chairman produced a memorandum drafted, it is said, by experts of the old Stefani bureau. Across the Atlantic, the Associated Press (AP) wires that a „spirit of compromise” pervades the corridors, though private circulars hint at lingering scepticism.
-From New York, United Press International (UPI/UP) recalls that Domei chroniclers followed the Tokyo tariff talks of 1934 „with equal fervour“. Market sheets collated by Extel record a brief rally in overseas securities; yet commentators consulted by Europapress counsel prudence for the Latin exchanges. Warsaw-based PAP intimates that Poland will vote „in concert with Budapest and Prague“. Stockholm’s Tidningarnas Telegrambyrå (TT), meanwhile, relays Nordic caution, whereas Belgrade’s TANJUG cautions against „any settlement that might hamper Balkan exports“.
+From New York, United     Press International (UPI/UP) recalls that Domei chroniclers followed the Tokyo tariff talks of 1934 „with equal fervour“. Market sheets collated by Extel record a brief rally in overseas securities; yet commentators consulted by Europapress counsel prudence for the Latin exchanges. Warsaw-based PAP intimates that Poland will vote „in concert with Budapest and Prague“. Stockholm’s Tidningarnas Telegrambyrå (TT), meanwhile, relays Nordic caution, whereas Belgrade’s TANJUG cautions against „any settlement that might hamper Balkan exports“.
 Late in the evening, TASS issues a bulletin insisting that existing fuel conventions be honoured; a companion wire from Interfax suggests the Kremlin regards the matter as „no less vital than the grain question of 1917“.
 
 
 """
 
 
-result = pipeline(text)
+result = pipeline(text, diagnostics=True)
 
 print("Result:")
-print(result)
+for entity in result:
+    if isinstance(entity, dict) and "surface" in entity:
+        print(f"Surface: '{entity['surface']}', Entity: {entity.get('entity')}, Relevance: {entity.get('relevance')}")
+    else:
+        print(entity)
 
 
 # torch

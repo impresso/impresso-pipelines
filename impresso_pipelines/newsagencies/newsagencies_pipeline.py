@@ -234,7 +234,7 @@ class ChunkAwareTokenClassification(Pipeline):
                         if probs[i] > 0.001
                     )
                     start, stop = offs.tolist()
-                    logger.debug(f"Sub‑token '{tok}' @({start},{stop}) → {prob_str}")
+                    logger.debug(f"Sub-token '{tok}' @({start},{stop}) → {prob_str}")
 
                 start, stop = offs.tolist()
 
@@ -379,22 +379,28 @@ class NewsAgenciesPipeline():
             if iob == "B":
                 if current:
                     merged.append(current)
+                start = tok["start"]
+                stop = tok["stop"]
                 current = {
-                    "surface": tok["word"],
+                    # preserve exact original spacing by slicing the raw text
+                    "surface": input_text[start:stop],
                     "entity": base,
-                    "start": tok["start"],
-                    "stop": tok["stop"],  # Updated key name
-                    "relevance": round(tok["score"],3),
+                    "start": start,
+                    "stop": stop,  # Updated key name
+                    "relevance": round(tok["score"], 3),
                 }
 
             elif iob == "I":
                 if current and current["entity"] == base:
-                    current["surface"] += f" {tok['word']}"
-                    current["stop"] = tok["stop"]  # Updated key name
+                    start = current["start"]
+                    stop = tok["stop"]
+                    current["surface"] = input_text[start:stop]
+                    current["stop"] = stop  # Updated key name
                     current["relevance"] = max(current["relevance"], tok["score"])
                     current["relevance"] = round(current["relevance"], 3)
                 else:
                     continue
+            
 
         if current:
             merged.append(current)
@@ -422,5 +428,3 @@ class NewsAgenciesPipeline():
             return merged
         else:
             return summary
-        
-
