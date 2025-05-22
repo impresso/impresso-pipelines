@@ -129,7 +129,7 @@ class LDATopicsPipeline:
 
         if doc_name is None:
             self.doc_counter += 1  # Increment the document counter for the next call
-        return output  # Returns clean lemmatized text without punctuation
+        return output[0]  # Returns clean lemmatized text without punctuation
     
     def find_latest_model_version(self):
         """
