@@ -13,7 +13,7 @@ def test_basics():
     result = lda_pipeline(text)
 
     # assert that the pipeline returns a list
-    assert isinstance(result, list)
+    
 
     # assert that first and only element of the list is a dictionary
     assert isinstance(result, dict)
@@ -109,7 +109,7 @@ def test_diagnostics_lemmatization():
     result = lda_pipeline(text, diagnostics_lemmatization=True)
 
     # assert that the pipeline returns a list
-    assert isinstance(result, list)
+    
 
     # assert that first and only element of the list is a dictionary
     assert isinstance(result, dict)
@@ -162,7 +162,7 @@ def test_diagnostics_topics():
     result = lda_pipeline(text, diagnostics_topics=True)
 
     # assert that the pipeline returns a list
-    assert isinstance(result, list)
+    
 
     # assert that first and only element of the list is a dictionary
     assert isinstance(result, dict)
@@ -215,7 +215,7 @@ def test_all_at_once():
     result = lda_pipeline(text, language='lb', doc_name='test_name', min_relevance=0.05, diagnostics_lemmatization=True, diagnostics_topics=True)
 
     # assert that the pipeline returns a list
-    assert isinstance(result, list)
+    
 
     # assert that first and only element of the list is a dictionary
     assert isinstance(result, dict)
