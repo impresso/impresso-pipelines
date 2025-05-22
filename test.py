@@ -52,11 +52,12 @@ Late in the evening, TASS issues a bulletin insisting that existing fuel convent
 result = pipeline(text, diagnostics=True)
 
 print("Result:")
-for entity in result:
-    if isinstance(entity, dict) and "surface" in entity:
-        print(f"Surface: '{entity['surface']}', Entity: {entity.get('entity')}, Relevance: {entity.get('relevance')}")
-    else:
-        print(entity)
+print(result)
+# for entity in result:
+#     if isinstance(entity, dict) and "surface" in entity:
+#         print(f"Surface: '{entity['surface']}', Entity: {entity.get('entity')}, Relevance: {entity.get('relevance')}")
+#     else:
+#         print(entity)
 
 
 # torch

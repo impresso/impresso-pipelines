@@ -421,8 +421,14 @@ class NewsAgenciesPipeline():
         # sort merged by relevance
         merged.sort(key=lambda x: x["relevance"], reverse=True)
 
-        # append original text to merged as a dict with key "text"
-        merged.append({"text": input_text})
+        merged = {
+            "agencies": merged,
+            "text": input_text,
+        }
+
+        summary = {
+            "agencies": summary,
+        }
 
         if diagnostics:
             return merged
