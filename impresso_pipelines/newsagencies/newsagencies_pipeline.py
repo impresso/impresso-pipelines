@@ -17,6 +17,7 @@ from transformers import (
 )
 from transformers.modeling_outputs import TokenClassifierOutput
 
+from impresso_pipelines.newsagencies.config import AGENCY_LINKS
 
 
 log_level = os.environ.get("LOGLEVEL", "WARNING").upper() # change back to DEBUG or INFO (for less verbose logging)
@@ -420,6 +421,15 @@ class NewsAgenciesPipeline():
 
         # sort merged by relevance
         merged.sort(key=lambda x: x["relevance"], reverse=True)
+
+
+        # add to merged to each agency another key "wikidata_link" with the link to the agency (stripe from entity from front org.ent.pressagency)
+        for agency in merged:
+            agency["wikidata_link"] = AGENCY_LINKS.get(agency['entity'].replace("org.ent.pressagency.", ""), None)
+
+        # # add to merged to each agency another key "wikidata_link" with the link to the agency
+        for agency in summary:
+            agency["wikidata_link"] = AGENCY_LINKS.get(agency['uid'].replace("org.ent.pressagency.", ""), None)
 
         merged = {
             "agencies": merged,
