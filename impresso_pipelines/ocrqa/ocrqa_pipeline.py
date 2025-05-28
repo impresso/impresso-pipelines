@@ -14,7 +14,7 @@ def cached_list_repo_files(repo_id: str):
 
 
 def get_bloomfilter(model_id: str, filename: str):
-        return BloomFilter.open(hf_hub_download(repo_id=model_id, filename=filename))
+        return BloomFilter.open(hf_hub_download(repo_id=model_id, filename=filename, local_files_only=True))
 
 class OCRQAPipeline:   
     def __init__(self):
