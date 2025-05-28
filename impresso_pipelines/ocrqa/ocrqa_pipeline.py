@@ -3,10 +3,14 @@ import unicodedata
 from huggingface_hub import hf_hub_download, list_repo_files
 from pybloomfilter import BloomFilter
 import re
+from functools import lru_cache
 
 from impresso_pipelines.langident.langident_pipeline import LangIdentPipeline
 
 
+@lru_cache(maxsize=1)
+def cached_list_repo_files(repo_id: str):
+    return list_repo_files(repo_id)
 
 
 def get_bloomfilter(model_id: str, filename: str):
@@ -17,7 +21,7 @@ class OCRQAPipeline:
         self.SUPPORTED_LANGUAGES = self.get_supported_languages()
 
     def get_supported_languages(self) -> set:
-        repo_files = list_repo_files("impresso-project/OCR-quality-assessment-unigram")
+        repo_files = cached_list_repo_files("impresso-project/OCR-quality-assessment-unigram")
         languages = {file.split('-')[-1].split('.')[0] for file in repo_files if file.startswith("ocrqa-wp_v")}
         
         return languages
@@ -34,21 +38,17 @@ class OCRQAPipeline:
             lang_result = lang_model(text)
             self.language = lang_result["language"]
 
-
         if self.language not in self.SUPPORTED_LANGUAGES:
             raise ValueError(f"Unsupported language: {self.language}")
 
         if self.version is None:
-            repo_files = list_repo_files("impresso-project/OCR-quality-assessment-unigram")
+            repo_files = cached_list_repo_files("impresso-project/OCR-quality-assessment-unigram")
             versions = [
                 re.search(r"_v(\d+\.\d+\.\d+)", file).group(1)
                 for file in repo_files
                 if file.startswith("ocrqa-wp_v") and file.endswith(f"-{self.language}.bloom")
             ]
-            
-            # versions = [v for v in versions if all(part.isdigit() for part in v.split('.'))]
             self.version = max(versions, key=lambda v: list(map(int, v.split('.'))))
-            
 
         bf = get_bloomfilter("impresso-project/OCR-quality-assessment-unigram", f"ocrqa-wp_v{self.version}-{self.language}.bloom")
 
@@ -116,7 +116,7 @@ class OCRQAPipeline:
             bloom_filter (BloomFilter): The bloom filter to use for filtering.
 
         Returns:
-            Dict[str, Union[str, float, Dict[str, Union[List[str], str]]]]: The output containing language, score, and optionally diagnostics.
+            Dict[str, Union[str, float, Dict[str, Union[List[str, str]]]]]: The output containing language, score, and optionally diagnostics.
         """
         knowns = set()
         unknowns = set()
