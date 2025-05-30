@@ -20,6 +20,7 @@ class OCRQAPipeline:
     def __init__(self):
         self.SUPPORTED_LANGUAGES = self.get_supported_languages()
         self.lang_model = LangIdentPipeline()  # Initialize LangIdentPipeline here
+        self.bloomfilters = {}  # Cache for BloomFilter instances
 
     def get_supported_languages(self) -> set:
         repo_files = cached_list_repo_files("impresso-project/OCR-quality-assessment-unigram")
@@ -50,7 +51,14 @@ class OCRQAPipeline:
             ]
             self.version = max(versions, key=lambda v: list(map(int, v.split('.'))))
 
-        bf = get_bloomfilter("impresso-project/OCR-quality-assessment-unigram", f"ocrqa-wp_v{self.version}-{self.language}.bloom")
+        # Check if BloomFilter for the language and version is already cached
+        bloomfilter_key = f"{self.language}_{self.version}"
+        if bloomfilter_key not in self.bloomfilters:
+            self.bloomfilters[bloomfilter_key] = get_bloomfilter(
+                "impresso-project/OCR-quality-assessment-unigram", 
+                f"ocrqa-wp_v{self.version}-{self.language}.bloom"
+            )
+        bf = self.bloomfilters[bloomfilter_key]
 
         output = self.filter_text(text, bf)
 
