@@ -19,6 +19,7 @@ def get_bloomfilter(model_id: str, filename: str):
 class OCRQAPipeline:   
     def __init__(self):
         self.SUPPORTED_LANGUAGES = self.get_supported_languages()
+        self.lang_model = LangIdentPipeline()  # Initialize LangIdentPipeline here
 
     def get_supported_languages(self) -> set:
         repo_files = cached_list_repo_files("impresso-project/OCR-quality-assessment-unigram")
@@ -34,8 +35,7 @@ class OCRQAPipeline:
         self.supported_languages = supported_languages
         
         if self.language is None:
-            lang_model = LangIdentPipeline()
-            lang_result = lang_model(text)
+            lang_result = self.lang_model(text)  # Use the initialized LangIdentPipeline
             self.language = lang_result["language"]
 
         if self.language not in self.SUPPORTED_LANGUAGES:
