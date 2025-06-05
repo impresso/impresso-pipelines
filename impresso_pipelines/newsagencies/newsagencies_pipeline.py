@@ -441,6 +441,18 @@ class NewsAgenciesPipeline():
         }
 
         if diagnostics:
+            if 'agencies' in merged and isinstance(merged['agencies'], list):
+                new_agencies = []
+                for item in merged['agencies']:
+                    new_item = {}
+                    for key in item:
+                        if key == 'entity':
+                            new_item['uid'] = item[key]
+                        else:
+                            new_item[key] = item[key]
+                    new_agencies.append(new_item)
+                merged['agencies'] = new_agencies
+                
             return merged
         else:
             return summary
