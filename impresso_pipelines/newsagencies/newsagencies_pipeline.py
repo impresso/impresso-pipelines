@@ -326,7 +326,7 @@ class NewsAgenciesPipeline():
     def __init__(self):
         pass
 
-    def __call__(self, input_text, min_relevance=0.1, diagnostics=False, model_id="impresso-project/ner-newsagency-bert-multilingual", suppress_entities: Optional[Sequence[str]] = None):
+    def __call__(self, input_text, min_relevance=0.1, diagnostics=False, model_id="impresso-project/ner-newsagency-bert-multilingual", suppress_entities: Optional[Sequence[str]] = []):
         """
         Run the NER pipeline programmatically.
 
