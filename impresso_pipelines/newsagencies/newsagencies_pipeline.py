@@ -344,7 +344,7 @@ class NewsAgenciesPipeline():
             Tuple[List[Dict[str, Any]], Dict[str, float]]: Extracted entities and summary.
         """
         # suppress_entities = suppress_entities or []
-        suppress_entities = ['org.ent.pressagency.unk', 'ag', 'pers.ind.articleauthor']
+        suppress_entities = suppress_entities + ['org.ent.pressagency.unk', 'ag', 'pers.ind.articleauthor']
         config = AutoConfig.from_pretrained(model_id)
         model = NewsAgencyTokenClassifier.from_pretrained(model_id, config=config)
 
