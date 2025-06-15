@@ -95,7 +95,7 @@ def test_diagnostics():
         Der Deutsche Depeschendienst / dapd (DDP‑DAPD) berichtet von letzter Minute‑Verhandlungen, während die Deutsche Presse‑Agentur (dpa) meldet, der Reichskanzler halte sich „zu weitergehenden Stellungnahmen bedeckt“. Aus Wien telegraphiert die Österreichische Presseagentur (APA), man hege „vorsichtigen Optimismus“; gleichzeitig warnt die Schweizerische Depeschenagentur (ATS/SDA) vor juristischen Fallstricken im Alpenraum. Die Schweizer Mittelpresse (SPK‑SMP) lässt verlauten, mehrere Kantone pochten auf Kompensationen. Nach einer Drahtnachricht der tschechischen ČTK wolle Prag demnächst ein Gutachten veröffentlichen.
     """ 
 
-    result = news_pipeline(text)
+    result = news_pipeline(text, diagnostics=True)
 
     # check that it returns a key 'agencies' and value which is a list
     assert 'agencies' in result
