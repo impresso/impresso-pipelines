@@ -26,7 +26,6 @@ jobs:
           poetry-version: ${{ matrix.poetry-version }}
       - name: Install dependencies
         run: |
-          pip install pytest-lazy-fixture
           poetry install --all-extras
       - name: Unit tests
         run: |
