@@ -81,7 +81,7 @@ print(result)
    {'t': 'tm-de-all-v2.0_tp02_de', 'p': 0.03},
    {'t': 'tm-de-all-v2.0_tp31_de', 'p': 0.03},
    {'t': 'tm-de-all-v2.0_tp66_de', 'p': 0.03}],
-  'min_p': 0.02,
+  'relevance': 0.02,
   'topic_model_id': 'tm-de-all-v2.0',
   'topic_model_description': 'https://huggingface.co/impresso-project/mallet-topic-inferencer/resolve/main/models/tm/tm-de-all-v2.0.topic_model_topic_description.jsonl.bz2'}]
 ```
