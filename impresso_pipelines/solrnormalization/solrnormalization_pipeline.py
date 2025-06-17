@@ -6,6 +6,7 @@ import urllib.request
 from typing import List, Dict, Optional
 import tempfile
 import shutil
+from ..langident import LangIdentPipeline
 
 class SolrNormalizationPipeline:
     LUCENE_VERSION = "9.3.0"
@@ -27,6 +28,7 @@ class SolrNormalizationPipeline:
         self._download_dependencies()
         self._create_stopwords()
         self._analyzers = {}
+        self._lang_detector = None
 
     def __enter__(self):
         return self
@@ -140,28 +142,48 @@ class SolrNormalizationPipeline:
         finally:
             stream.close()
 
-    def __call__(self, text: str, lang: str = "de") -> Dict[str, List[str]]:
+    def _detect_language(self, text: str) -> str:
+        """Detect the language of the input text."""
+        if self._lang_detector is None:
+            self._lang_detector = LangIdentPipeline()
+        
+        result = self._lang_detector(text)
+        detected_lang = result['language']
+        
+        if detected_lang not in self.stopwords:
+            raise ValueError(f"Detected language '{detected_lang}' is not supported. Only 'de' and 'fr' are supported.")
+            
+        return detected_lang
+
+    def __call__(self, text: str, lang: Optional[str] = None) -> Dict[str, List[str]]:
         """
         Process text through the Solr normalization pipeline.
         
         Args:
             text (str): The input text to normalize
-            lang (str): Language code ('de' or 'fr')
+            lang (str, optional): Language code ('de' or 'fr'). If not provided, language will be detected automatically.
             
         Returns:
-            Dict containing normalized tokens
+            Dict containing normalized tokens and detected language
+            
+        Raises:
+            ValueError: If the language (specified or detected) is not supported
         """
-        if lang not in self.stopwords:
-            raise ValueError(f"Unsupported language: {lang}")
+        # Detect language if not specified
+        detected_lang = self._detect_language(text) if lang is None else lang
+        
+        # Validate language support
+        if detected_lang not in self.stopwords:
+            raise ValueError(f"Unsupported language: '{detected_lang}'. Only {', '.join(self.stopwords.keys())} are supported.")
 
         self._start_jvm()
         
-        if lang not in self._analyzers:
-            self._analyzers[lang] = self._build_analyzer(lang)
+        if detected_lang not in self._analyzers:
+            self._analyzers[detected_lang] = self._build_analyzer(detected_lang)
             
-        tokens = self._analyze_text(self._analyzers[lang], text)
+        tokens = self._analyze_text(self._analyzers[detected_lang], text)
         
         return {
-            "language": lang,
+            "language": detected_lang,
             "tokens": tokens
         }
