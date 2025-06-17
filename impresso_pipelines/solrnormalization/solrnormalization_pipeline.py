@@ -6,7 +6,6 @@ import urllib.request
 from typing import List, Dict, Optional
 import tempfile
 import shutil
-import atexit
 
 class SolrNormalizationPipeline:
     LUCENE_VERSION = "9.3.0"
@@ -130,15 +129,16 @@ class SolrNormalizationPipeline:
         from java.io import StringReader
         from org.apache.lucene.analysis.tokenattributes import CharTermAttribute
         tokens = []
-        with analyzer:
-            stream = analyzer.tokenStream("field", StringReader(text))
+        stream = analyzer.tokenStream("field", StringReader(text))
+        try:
             termAttr = stream.addAttribute(CharTermAttribute.class_)
             stream.reset()
             while stream.incrementToken():
                 tokens.append(termAttr.toString())
             stream.end()
+            return tokens
+        finally:
             stream.close()
-        return tokens
 
     def __call__(self, text: str, lang: str = "de") -> Dict[str, List[str]]:
         """
