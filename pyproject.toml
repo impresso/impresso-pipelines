@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "impresso-pipelines"
-version = "0.4.6"
-description = "A custom package for language identification subpackage and OCR QA score calculation subpackage (imitating pipelines)"
+version = "0.4.6.1"
+description = "A custom package containing multiple pipelines simplifying reproducibility of impresso steps"
 authors = ["Glebs Vinarskis <gleb.vinarskis@gmail.com>"]
 readme = "README.md"
 
@@ -28,6 +28,7 @@ langident = ["huggingface_hub", "floret"]
 ocrqa = ["pybloomfiltermmap3", "huggingface_hub", "floret"]
 ldatopics = ["pybloomfiltermmap3", "huggingface_hub", "floret", "jpype1", "smart_open", "boto3", "python-dotenv", "spacy", "jsonschema"]
 newsagencies = ["transformers", "pytorch"]
+solrnormalization = ["jpype1"]
 all = ["pybloomfiltermmap3", "huggingface_hub", "floret", "jpype1", "smart_open", "boto3", "python-dotenv", "spacy", "transformers", "pytorch", "jsonschema"]
 
 [tool.poetry.dev-dependencies]
