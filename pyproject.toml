@@ -28,7 +28,7 @@ langident = ["huggingface_hub", "floret"]
 ocrqa = ["pybloomfiltermmap3", "huggingface_hub", "floret"]
 ldatopics = ["pybloomfiltermmap3", "huggingface_hub", "floret", "jpype1", "smart_open", "boto3", "python-dotenv", "spacy", "jsonschema"]
 newsagencies = ["transformers", "pytorch"]
-solrnormalization = ["jpype1"]
+solrnormalization = ["jpype1", "huggingface_hub", "floret"]
 all = ["pybloomfiltermmap3", "huggingface_hub", "floret", "jpype1", "smart_open", "boto3", "python-dotenv", "spacy", "transformers", "pytorch", "jsonschema"]
 
 [tool.poetry.dev-dependencies]
