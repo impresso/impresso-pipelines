@@ -12,14 +12,16 @@ This repository contains a Python package designed for efficient and modular pro
 ## Installation
 To install the package with all subpackages, use:
 ```bash
-pip install impresso_pipelines[all]
+pip install "impresso_pipelines[all]"
 ```
 
 To install individual subpackages without any additional dependencies, use:
 ```bash
-pip install impresso_pipelines[langident]   # Language Identification
-pip install impresso_pipelines[ocrqa]       # OCR QA
-pip install impresso_pipelines[ldatopics]   # LDA Topics
+pip install "impresso_pipelines[langident]"   # Language Identification
+pip install "impresso_pipelines[ocrqa]"       # OCR QA
+pip install "impresso_pipelines[ldatopics]"   # LDA Topics
+pip install "impresso_pipelines[newsagencies]"  # News Agencies
+pip install "impresso_pipelines[solrnormalization]"
 ```
 
 ## Usage

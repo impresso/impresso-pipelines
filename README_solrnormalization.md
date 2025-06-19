@@ -3,8 +3,6 @@ Make sure you have installed the package as demonstrated in the main README.
 
 ```python
 # Initialize the pipeline
-from impresso_pipelines.solrnormalization.solrnormalization_pipeline import SolrNormalizationPipeline
-
 pipeline = SolrNormalizationPipeline()
 
 # Example text for normalization
