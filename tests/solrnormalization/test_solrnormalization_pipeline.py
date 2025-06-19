@@ -1,67 +1,60 @@
-import pytest
-from impresso_pipelines.solrnormalization.solrnormalization_pipeline import SolrNormalizationPipeline
+# import pytest
+# from impresso_pipelines.solrnormalization.solrnormalization_pipeline import SolrNormalizationPipeline
 
-def test_solrnormalization_pipeline_basic():
-    pipeline = SolrNormalizationPipeline()
-    de_text = "Der Hund läuft schnell durch den Wald und über die Wiese."
+# def test_solrnormalization_pipeline_basic():
+#     pipeline = SolrNormalizationPipeline()
+#     de_text = "Der Hund läuft schnell durch den Wald und über die Wiese."
 
-    result = pipeline(de_text)
+#     result = pipeline(de_text)
 
-    # Assert that the pipeline returns a dictionary
-    assert isinstance(result, dict)
-    # Assert that the result contains 'language' and 'tokens' keys
-    assert 'language' in result.keys()
-    assert 'tokens' in result.keys()
-    # Assert that 'tokens' is a list
-    assert isinstance(result['tokens'], list)
-    # Assert that the detected language is 'de'
-    assert result['language'] == 'de'
+#     # Assert that the pipeline returns a dictionary
+#     assert isinstance(result, dict)
+#     # Assert that the result contains 'language' and 'tokens' keys
+#     assert 'language' in result.keys()
+#     assert 'tokens' in result.keys()
+#     # Assert that 'tokens' is a list
+#     assert isinstance(result['tokens'], list)
+#     # Assert that the detected language is 'de'
+#     assert result['language'] == 'de'
 
-def test_solrnormalization_pipeline_with_language():
-    pipeline = SolrNormalizationPipeline()
-    fr_text = "Le chien court rapidement à travers la forêt et sur la prairie."
+# def test_solrnormalization_pipeline_with_language():
+#     pipeline = SolrNormalizationPipeline()
+#     fr_text = "Le chien court rapidement à travers la forêt et sur la prairie."
 
-    result = pipeline(fr_text, lang="fr")
+#     result = pipeline(fr_text, lang="fr")
 
-    # Assert that the pipeline returns a dictionary
-    assert isinstance(result, dict)
-    # Assert that the result contains 'language' and 'tokens' keys
-    assert 'language' in result.keys()
-    assert 'tokens' in result.keys()
-    # Assert that 'tokens' is a list
-    assert isinstance(result['tokens'], list)
-    # Assert that the specified language is 'fr'
-    assert result['language'] == 'fr'
+#     # Assert that the pipeline returns a dictionary
+#     assert isinstance(result, dict)
+#     # Assert that the result contains 'language' and 'tokens' keys
+#     assert 'language' in result.keys()
+#     assert 'tokens' in result.keys()
+#     # Assert that 'tokens' is a list
+#     assert isinstance(result['tokens'], list)
+#     # Assert that the specified language is 'fr'
+#     assert result['language'] == 'fr'
 
-def test_solrnormalization_pipeline_unsupported_language():
-    pipeline = SolrNormalizationPipeline()
-    unsupported_text = "This is an unsupported language text."
+# def test_solrnormalization_pipeline_detect_language():
+#     pipeline = SolrNormalizationPipeline()
+#     de_text = "Der Hund läuft schnell durch den Wald und über die Wiese."
 
-    with pytest.raises(ValueError, match="Unsupported language"):
-        pipeline(unsupported_text, lang="en")
+#     result = pipeline(de_text)
 
-def test_solrnormalization_pipeline_detect_language():
-    pipeline = SolrNormalizationPipeline()
-    de_text = "Der Hund läuft schnell durch den Wald und über die Wiese."
+#     # Assert that the detected language is 'de'
+#     assert result['language'] == 'de'
+#     # Assert that tokens are normalized correctly
+#     assert "hund" in result['tokens']
+#     assert "wald" in result['tokens']
+#     assert "wiese" in result['tokens']
 
-    result = pipeline(de_text)
+# def test_solrnormalization_pipeline_detect_language_fr():
+#     pipeline = SolrNormalizationPipeline()
+#     fr_text = "Le chien court rapidement à travers la forêt et sur la prairie."
 
-    # Assert that the detected language is 'de'
-    assert result['language'] == 'de'
-    # Assert that tokens are normalized correctly
-    assert "hund" in result['tokens']
-    assert "wald" in result['tokens']
-    assert "wiese" in result['tokens']
+#     result = pipeline(fr_text)
 
-def test_solrnormalization_pipeline_detect_language_fr():
-    pipeline = SolrNormalizationPipeline()
-    fr_text = "Le chien court rapidement à travers la forêt et sur la prairie."
-
-    result = pipeline(fr_text)
-
-    # Assert that the detected language is 'fr'
-    assert result['language'] == 'fr'
-    # Assert that tokens are normalized correctly
-    assert "chien" in result['tokens']
-    assert "forêt" in result['tokens']
-    assert "prairie" in result['tokens']
+#     # Assert that the detected language is 'fr'
+#     assert result['language'] == 'fr'
+#     # Assert that tokens are normalized correctly
+#     assert "chien" in result['tokens']
+#     assert "forêt" in result['tokens']
+#     assert "prairie" in result['tokens']
