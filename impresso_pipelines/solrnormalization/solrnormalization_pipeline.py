@@ -9,9 +9,17 @@ import shutil
 from ..langident import LangIdentPipeline
 
 class SolrNormalizationPipeline:
+    """
+    Pipeline for text normalization using Apache Lucene analyzers.
+    Handles language detection, tokenization, and normalization for supported languages ('de', 'fr').
+    """
+
     LUCENE_VERSION = "9.3.0"
-    
+
     def __init__(self):
+        """
+        Initialize the pipeline, setting up temporary directories, downloading dependencies, and preparing stopwords.
+        """
         # Create temporary directory
         self.temp_dir = tempfile.mkdtemp(prefix="solrnorm_")
         self.lib_dir = os.path.join(self.temp_dir, "lib")
@@ -31,13 +39,24 @@ class SolrNormalizationPipeline:
         self._lang_detector = None
 
     def __enter__(self):
+        """
+        Enter context manager.
+        Returns:
+            Self instance for use within a context.
+        """
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Exit context manager and clean up resources.
+        """
         self.cleanup()
 
     def cleanup(self):
-        """Clean up temporary directory and resources"""
+        """
+        Clean up temporary directories and resources.
+        Ensures analyzers are closed and temporary files are deleted.
+        """
         try:
             if hasattr(self, '_analyzers'):
                 # Close any open analyzers
@@ -54,13 +73,21 @@ class SolrNormalizationPipeline:
             print(f"Warning: Cleanup failed: {e}")
 
     def __del__(self):
-        """Ensure cleanup happens even if context manager is not used"""
+        """
+        Destructor to ensure cleanup happens if context manager is not used.
+        """
         self.cleanup()
 
     def _setup_environment(self):
+        """
+        Create necessary directories for storing dependencies.
+        """
         os.makedirs(self.lib_dir, exist_ok=True)
 
     def _download_dependencies(self):
+        """
+        Download required Lucene JAR files if not already present.
+        """
         for name, url in self.jar_urls.items():
             dest = os.path.join(self.lib_dir, os.path.basename(url))
             if not os.path.isfile(dest):
@@ -70,6 +97,9 @@ class SolrNormalizationPipeline:
                 print(f"✔️ {name} already exists.")
 
     def _create_stopwords(self):
+        """
+        Generate stopword files for supported languages ('de', 'fr').
+        """
         stopwords = {
             "de": ["und", "oder", "aber", "der", "die", "das", "über", "den"],
             "fr": ["le", "la", "les", "des", "et", "mais", "ou", "donc", "or", "ni", "car"]
@@ -80,6 +110,9 @@ class SolrNormalizationPipeline:
                     f.write("\n".join(words))
 
     def _start_jvm(self):
+        """
+        Start the JVM with the required classpath for Lucene libraries.
+        """
         if not jpype.isJVMStarted():
             jar_paths = [os.path.join(self.lib_dir, os.path.basename(url)) 
                         for url in self.jar_urls.values()]
@@ -89,6 +122,18 @@ class SolrNormalizationPipeline:
             jpype.startJVM(classpath=jar_paths)
 
     def _build_analyzer(self, lang: str):
+        """
+        Build a custom Lucene analyzer for the specified language.
+        
+        Args:
+            lang (str): Language code ('de' or 'fr').
+        
+        Returns:
+            CustomAnalyzer instance configured for the language.
+        
+        Raises:
+            ValueError: If the language is unsupported.
+        """
         from org.apache.lucene.analysis.custom import CustomAnalyzer
         from java.nio.file import Paths
         from java.util import HashMap
@@ -128,6 +173,16 @@ class SolrNormalizationPipeline:
             raise ValueError(f"Unsupported language: {lang}")
 
     def _analyze_text(self, analyzer, text: str) -> List[str]:
+        """
+        Tokenize and normalize text using the provided Lucene analyzer.
+        
+        Args:
+            analyzer: Lucene analyzer instance.
+            text (str): Input text to process.
+        
+        Returns:
+            List of normalized tokens.
+        """
         from java.io import StringReader
         from org.apache.lucene.analysis.tokenattributes import CharTermAttribute
         tokens = []
@@ -143,7 +198,18 @@ class SolrNormalizationPipeline:
             stream.close()
 
     def _detect_language(self, text: str) -> str:
-        """Detect the language of the input text."""
+        """
+        Detect the language of the input text using LangIdentPipeline.
+        
+        Args:
+            text (str): Input text for language detection.
+        
+        Returns:
+            Detected language code ('de' or 'fr').
+        
+        Raises:
+            ValueError: If the detected language is unsupported.
+        """
         if self._lang_detector is None:
             self._lang_detector = LangIdentPipeline()
         
@@ -157,17 +223,17 @@ class SolrNormalizationPipeline:
 
     def __call__(self, text: str, lang: Optional[str] = None) -> Dict[str, List[str]]:
         """
-        Process text through the Solr normalization pipeline.
+        Process text through the normalization pipeline.
         
         Args:
-            text (str): The input text to normalize
-            lang (str, optional): Language code ('de' or 'fr'). If not provided, language will be detected automatically.
-            
+            text (str): Input text to normalize.
+            lang (str, optional): Language code ('de' or 'fr'). If not provided, language is detected automatically.
+        
         Returns:
-            Dict containing normalized tokens and detected language
-            
+            Dict containing normalized tokens and detected language.
+        
         Raises:
-            ValueError: If the language (specified or detected) is not supported
+            ValueError: If the language (specified or detected) is unsupported.
         """
         # Detect language if not specified
         detected_lang = self._detect_language(text) if lang is None else lang
