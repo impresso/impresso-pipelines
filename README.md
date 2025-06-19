@@ -17,11 +17,11 @@ pip install "impresso_pipelines[all]"
 
 To install individual subpackages without any additional dependencies, use:
 ```bash
-pip install "impresso_pipelines[langident]"   # Language Identification
-pip install "impresso_pipelines[ocrqa]"       # OCR QA
-pip install "impresso_pipelines[ldatopics]"   # LDA Topics
-pip install "impresso_pipelines[newsagencies]"  # News Agencies
-pip install "impresso_pipelines[solrnormalization]"
+pip install "impresso_pipelines[langident]"         # Language Identification
+pip install "impresso_pipelines[ocrqa]"             # OCR QA
+pip install "impresso_pipelines[ldatopics]"         # LDA Topics
+pip install "impresso_pipelines[newsagencies]"      # News Agencies
+pip install "impresso_pipelines[solrnormalization]" # Solrnomalization
 ```
 
 ## Usage
