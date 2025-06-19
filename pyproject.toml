@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "impresso-pipelines"
-version = "0.4.6"
-description = "A custom package for language identification subpackage and OCR QA score calculation subpackage (imitating pipelines)"
+version = "0.4.6.1"
+description = "A custom package containing multiple pipelines simplifying reproducibility of impresso steps"
 authors = ["Glebs Vinarskis <gleb.vinarskis@gmail.com>"]
 readme = "README.md"
 
@@ -12,6 +12,7 @@ numpy = "1.26.4"
 huggingface_hub = { version = "*", optional = true }
 floret = { version = "*", optional = true }
 pybloomfiltermmap3 = { version = "*", optional = true }
+pysolr = "*"
 
 jpype1 = { version = "^1.4.1", optional = true }
 smart_open = { version = "^6.3.0", optional = true }
@@ -28,6 +29,7 @@ langident = ["huggingface_hub", "floret"]
 ocrqa = ["pybloomfiltermmap3", "huggingface_hub", "floret"]
 ldatopics = ["pybloomfiltermmap3", "huggingface_hub", "floret", "jpype1", "smart_open", "boto3", "python-dotenv", "spacy", "jsonschema"]
 newsagencies = ["transformers", "pytorch"]
+solrnormalization = ["jpype1", "huggingface_hub", "floret", "pysolr"]
 all = ["pybloomfiltermmap3", "huggingface_hub", "floret", "jpype1", "smart_open", "boto3", "python-dotenv", "spacy", "transformers", "pytorch", "jsonschema"]
 
 [tool.poetry.dev-dependencies]
@@ -39,6 +41,10 @@ transformers = "^4.49.0"
 flake8 = "^6.0"
 mypy = "^1.2"
 pytest-cov = "^4.0"  # Optional for test coverage
+jpype1 = "^1.4.1"
+huggingface_hub = "*"
+floret = "*"
+pysolr = "^3.9.0"
 
 [build-system]
 build-backend = "poetry.core.masonry.api"
