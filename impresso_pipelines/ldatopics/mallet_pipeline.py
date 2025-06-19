@@ -19,7 +19,15 @@ except ImportError:
 
 
 class LDATopicsPipeline:
+    """
+    Pipeline for topic modeling using Mallet and SpaCy.
+    Handles language detection, lemmatization, vectorization, and topic inference.
+    """
+
     def __init__(self):
+        """
+        Initializes the pipeline, sets up temporary directories, and starts the JVM for Mallet.
+        """
         self.temp_dir = tempfile.mkdtemp(prefix="mallet_models_")  # Create temp folder for models
         self.temp_output_file = None  # Placeholder for temporary output file
         self.latest_model = None
@@ -37,7 +45,7 @@ class LDATopicsPipeline:
     
     def setup_mallet_jars(self):
         """
-        Ensures that the Mallet JAR files are available locally using Hugging Face caching.
+        Downloads Mallet JAR files from Hugging Face Hub and ensures they are locally available.
 
         Returns:
             str: Path to the directory containing the Mallet JAR files.
@@ -57,7 +65,21 @@ class LDATopicsPipeline:
         return os.path.dirname(jar_paths[0])
 
 
-    def __call__(self, text, language=None, doc_name = None, diagnostics_lemmatization=False, diagnostics_topics=False, min_relevance=0.02):
+    def __call__(self, text, language=None, doc_name=None, diagnostics_lemmatization=False, diagnostics_topics=False, min_relevance=0.02):
+        """
+        Executes the pipeline on the input text.
+
+        Parameters:
+            text (str): Input text for processing.
+            language (str, optional): Language of the text. Auto-detected if None.
+            doc_name (str, optional): Name of the document.
+            diagnostics_lemmatization (bool): Whether to include lemmatization diagnostics.
+            diagnostics_topics (bool): Whether to include topic diagnostics.
+            min_relevance (float): Minimum relevance threshold for topics.
+
+        Returns:
+            dict: Processed output with topics and metadata.
+        """
         self.min_p = min_relevance
         if self.min_p < 0.02:
             raise ValueError("min_p must be at least 0.02")
@@ -133,10 +155,10 @@ class LDATopicsPipeline:
     
     def find_latest_model_version(self):
         """
-        Finds the latest model version from the Hugging Face Hub.
+        Finds the latest version of the topic model for the specified language.
 
-        Returns:
-            str: The latest model version.
+        Raises:
+            ValueError: If no model version is found.
         """
         repo_id = "impresso-project/mallet-topic-inferencer"
         files = list_repo_files(repo_id)
@@ -151,13 +173,30 @@ class LDATopicsPipeline:
             raise ValueError(f"Could not get latest version for language: {self.language}")
 
     def language_detection(self, text):
+        """
+        Detects the language of the input text using LangIdentPipeline.
+
+        Parameters:
+            text (str): Input text.
+
+        Returns:
+            str: Detected language.
+        """
         lang_model = LangIdentPipeline()
         lang_result = lang_model(text)
         self.language = lang_result["language"]
         return self.language
     
     def SPACY(self, text):
-        """Uses the appropriate SpaCy model based on language"""
+        """
+        Lemmatizes the input text using SpaCy based on the detected language.
+
+        Parameters:
+            text (str): Input text.
+
+        Returns:
+            str: Lemmatized text.
+        """
         from impresso_pipelines.ldatopics.SPACY import SPACY  # Lazy import
         from impresso_pipelines.ldatopics.config import SUPPORTED_LANGUAGES  # Lazy import
 
@@ -169,6 +208,14 @@ class LDATopicsPipeline:
         return nlp(text)
 
     def vectorizer_mallet(self, text, output_file, doc_name):
+        """
+        Vectorizes the lemmatized text using Mallet.
+
+        Parameters:
+            text (str): Lemmatized text.
+            output_file (str): Path to the output file.
+            doc_name (str): Name of the document.
+        """
         from impresso_pipelines.ldatopics.mallet_vectorizer_changed import MalletVectorizer  # Lazy import
 
 
@@ -187,6 +234,9 @@ class LDATopicsPipeline:
             mallet(text, f"doc{self.doc_counter}")
 
     def mallet_inferencer(self):
+        """
+        Runs the Mallet topic inferencer on the vectorized text.
+        """
         lang = self.language  # adjusting calling based on language
 
 
@@ -243,7 +293,7 @@ class LDATopicsPipeline:
             filepath (str): Path to the .jsonl file.
 
         Returns:
-            List[dict]: A list of dictionaries, one per JSONL line.
+            List[dict]: Parsed JSON objects.
         """
         data = []
         with open(filepath, "r", encoding="utf-8") as f:
@@ -261,6 +311,15 @@ class LDATopicsPipeline:
         return data
 
     def add_topic_words_to_output(self, output):
+        """
+        Adds top-10 topic words to the output based on precomputed topic descriptions.
+
+        Parameters:
+            output (dict): Processed output.
+
+        Returns:
+            dict: Output with added topic diagnostics.
+        """
         from impresso_pipelines.ldatopics.config import TOPIC_MODEL_DESCRIPTIONS_HF
 
          # If the pipeline returned a list of docs, recurse into each one
@@ -314,8 +373,15 @@ class LDATopicsPipeline:
 
     def rename_key_preserve_position(self, d: dict, old_key: str, new_key: str) -> dict:
         """
-        Return a new dict where old_key has been renamed to new_key,
-        but all other keys remain in their original order.
+        Renames a key in a dictionary while preserving the original key order.
+
+        Parameters:
+            d (dict): Input dictionary.
+            old_key (str): Key to be renamed.
+            new_key (str): New key name.
+
+        Returns:
+            dict: Dictionary with the renamed key.
         """
         new_d = {}
         for k, v in d.items():

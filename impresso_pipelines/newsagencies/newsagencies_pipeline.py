@@ -19,20 +19,19 @@ from transformers.modeling_outputs import TokenClassifierOutput
 
 from impresso_pipelines.newsagencies.config import AGENCY_LINKS
 
-
-log_level = os.environ.get("LOGLEVEL", "WARNING").upper() # change back to DEBUG or INFO (for less verbose logging)
+log_level = os.environ.get("LOGLEVEL", "WARNING").upper()  # Set logging level
 logging.basicConfig(level=getattr(logging, log_level, logging.DEBUG), force=True)
 logger = logging.getLogger(__name__)
 
 
 class NewsAgencyTokenClassifier(PreTrainedModel):
     """
-    A custom token classification model that extends the PreTrainedModel class.
+    A custom token classification model for identifying entities in text.
 
     Attributes:
-        config_class (type): The configuration class for the model.
-        num_labels (int): The number of labels for classification.
-        bert (nn.Module): The backbone encoder model.
+        config_class (type): Configuration class for the model.
+        num_labels (int): Number of classification labels.
+        bert (nn.Module): Backbone encoder model.
         dropout (nn.Dropout): Dropout layer for regularization.
         token_classifier (nn.Linear): Linear layer for token classification.
     """
@@ -42,10 +41,10 @@ class NewsAgencyTokenClassifier(PreTrainedModel):
 
     def __init__(self, config: BertConfig):
         """
-        Initializes the NewsAgencyTokenClassifier.
+        Initialize the token classifier model.
 
         Args:
-            config (BertConfig): The configuration object for the model.
+            config (BertConfig): Configuration object for the model.
         """
         super().__init__(config)
         self.num_labels = len(config.id2label)
@@ -75,7 +74,7 @@ class NewsAgencyTokenClassifier(PreTrainedModel):
         return_dict: bool = True,
     ) -> TokenClassifierOutput:
         """
-        Performs a forward pass through the model.
+        Perform a forward pass through the model.
 
         Args:
             input_ids (Optional[torch.Tensor]): Input token IDs.
@@ -89,7 +88,7 @@ class NewsAgencyTokenClassifier(PreTrainedModel):
             return_dict (bool): Whether to return a dictionary.
 
         Returns:
-            TokenClassifierOutput: The output of the token classification model.
+            TokenClassifierOutput: Model output containing logits, hidden states, and attentions.
         """
         outputs = self.bert(
             input_ids=input_ids,
@@ -122,7 +121,7 @@ class NewsAgencyTokenClassifier(PreTrainedModel):
 
 class ChunkAwareTokenClassification(Pipeline):
     """
-    A custom pipeline for token classification with stride handling and verbose logging.
+    A custom pipeline for token classification with chunk handling.
 
     Attributes:
         min_score (float): Minimum confidence score for filtering entities.
@@ -130,7 +129,7 @@ class ChunkAwareTokenClassification(Pipeline):
 
     def __init__(self, *args: Any, min_score: float = 0.50, **kwargs: Any):
         """
-        Initializes the ChunkAwareTokenClassification pipeline.
+        Initialize the pipeline.
 
         Args:
             min_score (float): Minimum confidence score for filtering entities.
@@ -142,7 +141,7 @@ class ChunkAwareTokenClassification(Pipeline):
         self, **kwargs: Any
     ) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
         """
-        Sanitizes the parameters for the pipeline.
+        Sanitize parameters for the pipeline.
 
         Args:
             **kwargs: Additional keyword arguments.
@@ -154,10 +153,10 @@ class ChunkAwareTokenClassification(Pipeline):
 
     def preprocess(self, text: str, **kwargs: Any) -> Dict[str, Any]:
         """
-        Preprocesses the input text for the model.
+        Tokenize and prepare input text for the model.
 
         Args:
-            text (str): The input text.
+            text (str): Input text.
 
         Returns:
             Dict[str, Any]: Tokenized input for the model.
@@ -178,7 +177,7 @@ class ChunkAwareTokenClassification(Pipeline):
         self, inputs: Dict[str, torch.Tensor]
     ) -> Tuple[TokenClassifierOutput, Dict[str, torch.Tensor]]:
         """
-        Performs a forward pass through the model.
+        Perform a forward pass through the model.
 
         Args:
             inputs (Dict[str, torch.Tensor]): Tokenized inputs.
@@ -199,7 +198,7 @@ class ChunkAwareTokenClassification(Pipeline):
         **kwargs: Any,
     ) -> List[Dict[str, Any]]:
         """
-        Post-processes the model outputs to extract entities.
+        Extract entities from model outputs.
 
         Args:
             model_and_inputs (Tuple[TokenClassifierOutput, Dict[str, torch.Tensor]]): Model outputs and inputs.
@@ -275,7 +274,7 @@ class ChunkAwareTokenClassification(Pipeline):
         seen: Set[Tuple[int, int, str]],
     ) -> Optional[Dict[str, Any]]:
         """
-        Finalizes a word by determining its entity label and confidence score.
+        Finalize a word by determining its entity label and confidence score.
 
         Args:
             tokens (List[str]): List of sub-tokens.
@@ -320,28 +319,35 @@ class ChunkAwareTokenClassification(Pipeline):
         }
 
 
+class NewsAgenciesPipeline:
+    """
+    A pipeline for extracting news agency entities from text.
 
+    Attributes:
+        None
+    """
 
-class NewsAgenciesPipeline():
     def __init__(self):
+        """
+        Initialize the pipeline.
+        """
         pass
 
-    def __call__(self, input_text, min_relevance=0.1, diagnostics=False, model_id="impresso-project/ner-newsagency-bert-multilingual", suppress_entities: Optional[Sequence[str]] = []):
+    def __call__(self, input_text: str, min_relevance: float = 0.1, diagnostics: bool = False, 
+                 model_id: str = "impresso-project/ner-newsagency-bert-multilingual", 
+                 suppress_entities: Optional[Sequence[str]] = []) -> Dict[str, Any]:
         """
-        Run the NER pipeline programmatically.
+        Run the pipeline to extract entities from text.
 
         Args:
-            model_id (str): The model identifier.
-            input_text (str): Input text for NER processing.
-            min_score (float): Minimum confidence score for filtering entities.
-            suppress_entities (Optional[Sequence[str]]): Sequence of entities to suppress.
-                Typically suppressed entities include:
-                - 'org.ent.pressagency.unk': Unknown press agencies.
-                - 'ag': General agency tags.
-                - 'pers.ind.articleauthor': Individual article authors.
+            input_text (str): Input text for processing.
+            min_relevance (float): Minimum confidence score for filtering entities.
+            diagnostics (bool): Whether to include diagnostics in the output.
+            model_id (str): Model identifier.
+            suppress_entities (Optional[Sequence[str]]): Entities to suppress.
 
         Returns:
-            Tuple[List[Dict[str, Any]], Dict[str, float]]: Extracted entities and summary.
+            Dict[str, Any]: Extracted entities and summary.
         """
         # suppress_entities = suppress_entities or []
         suppress_entities = suppress_entities + ['org.ent.pressagency.unk', 'ag', 'pers.ind.articleauthor']
