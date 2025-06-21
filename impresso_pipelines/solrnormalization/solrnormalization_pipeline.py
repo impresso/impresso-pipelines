@@ -73,7 +73,7 @@ class SolrNormalizationPipeline:
         except Exception as e:
             print(f"Warning: Cleanup failed: {e}")
 
-    def _load_snowball_stopwords(filepath):
+    def _load_snowball_stopwords(self, filepath):
         stopwords = []
         with open(filepath, encoding="utf-8") as f:
             for line in f:
