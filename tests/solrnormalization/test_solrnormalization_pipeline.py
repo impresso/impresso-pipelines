@@ -7,7 +7,7 @@ def test_solrnormalization_pipeline_importable():
     pipeline = SolrNormalizationPipeline()
     assert pipeline is not None
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 def ensure_jvm():
     import jpype
     if not jpype.isJVMStarted():
