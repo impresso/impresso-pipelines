@@ -1,5 +1,12 @@
 import pytest
 
+from impresso_pipelines.solrnormalization.solrnormalization_pipeline import SolrNormalizationPipeline
+
+def test_solrnormalization_pipeline_importable():
+    """Test that SolrNormalizationPipeline can be imported and instantiated."""
+    pipeline = SolrNormalizationPipeline()
+    assert pipeline is not None
+
 @pytest.fixture(scope="session", autouse=True)
 def ensure_jvm():
     import jpype
@@ -13,8 +20,7 @@ def ensure_jvm():
     except ImportError:
         pytest.skip("Lucene JARs not available or JVM failed to start", allow_module_level=True)
 
-from impresso_pipelines.solrnormalization.solrnormalization_pipeline import SolrNormalizationPipeline
-
+@pytest.mark.usefixtures("ensure_jvm")
 def test_solrnormalization_pipeline_basic():
     pipeline = SolrNormalizationPipeline()
     de_text = "Der Hund läuft schnell durch den Wald und über die Wiese."
@@ -31,6 +37,7 @@ def test_solrnormalization_pipeline_basic():
     # Assert that the detected language is 'de'
     assert result['language'] == 'de'
 
+@pytest.mark.usefixtures("ensure_jvm")
 def test_solrnormalization_pipeline_with_language():
     pipeline = SolrNormalizationPipeline()
     fr_text = "Le chien court rapidement à travers la forêt et sur la prairie."
@@ -47,6 +54,7 @@ def test_solrnormalization_pipeline_with_language():
     # Assert that the specified language is 'fr'
     assert result['language'] == 'fr'
 
+@pytest.mark.usefixtures("ensure_jvm")
 def test_solrnormalization_pipeline_detect_language():
     pipeline = SolrNormalizationPipeline()
     de_text = "Der Hund läuft schnell durch den Wald und über die Wiese."
@@ -60,6 +68,7 @@ def test_solrnormalization_pipeline_detect_language():
     assert "wald" in result['tokens']
     assert "wiese" in result['tokens']
 
+@pytest.mark.usefixtures("ensure_jvm")
 def test_solrnormalization_pipeline_detect_language_fr():
     pipeline = SolrNormalizationPipeline()
     fr_text = "Le chien court rapidement à travers la forêt et sur la prairie."
