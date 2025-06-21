@@ -1,13 +1,17 @@
 import pytest
 
-pytest.importorskip("jpype")
-
-try:
+@pytest.fixture(scope="session", autouse=True)
+def ensure_jvm():
     import jpype
-    jpype.startJVM(classpath=["lucene_jars/*"])
-    from org.apache.lucene.analysis.standard import StandardAnalyzer
-except Exception:
-    pytest.skip("Lucene JARs not available or JVM failed to start", allow_module_level=True)
+    if not jpype.isJVMStarted():
+        try:
+            jpype.startJVM(classpath=["lucene_jars/*"])
+        except RuntimeError:
+            pytest.skip("Lucene JARs not available or JVM failed to start", allow_module_level=True)
+    try:
+        from org.apache.lucene.analysis.standard import StandardAnalyzer
+    except ImportError:
+        pytest.skip("Lucene JARs not available or JVM failed to start", allow_module_level=True)
 
 from impresso_pipelines.solrnormalization.solrnormalization_pipeline import SolrNormalizationPipeline
 
