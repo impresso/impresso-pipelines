@@ -1,4 +1,6 @@
 import pytest
+import glob
+import os
 
 from impresso_pipelines.solrnormalization.solrnormalization_pipeline import SolrNormalizationPipeline
 
@@ -16,13 +18,17 @@ def test_solrnormalization_pipeline_error_on_unsupported_language():
 @pytest.fixture(scope="session")
 def ensure_jvm():
     import jpype
+    # Find all JARs in lucene_jars directory
+    jar_dir = "lucene_jars"
+    jar_paths = glob.glob(os.path.join(jar_dir, "*.jar"))
     if not jpype.isJVMStarted():
         try:
-            jpype.startJVM(classpath=["lucene_jars/*"])
+            jpype.startJVM(classpath=jar_paths)
         except RuntimeError:
             pytest.skip("Lucene JARs not available or JVM failed to start", allow_module_level=True)
     try:
         from org.apache.lucene.analysis.standard import StandardAnalyzer
+        from org.apache.lucene.analysis.custom import CustomAnalyzer
     except ImportError:
         pytest.skip("Lucene JARs not available or JVM failed to start", allow_module_level=True)
 
