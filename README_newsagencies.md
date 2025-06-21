@@ -2,6 +2,7 @@
 Make sure you have installed the package as demonstrated in the main README.
 
 ```python
+from impresso_pipelines.newsagencies import NewsAgenciesPipeline
 # Initialize the pipeline
 pipeline = NewsAgenciesPipeline()
 

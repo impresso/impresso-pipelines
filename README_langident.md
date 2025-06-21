@@ -1,6 +1,7 @@
 ### Language Identification Example
 Make sure you have installed the package as demostrated in the main README. 
 ```python
+from impresso_pipelines.langident import LangIdentPipeline
 # Initialize the pipeline
 lang_pipeline = LangIdentPipeline()
 

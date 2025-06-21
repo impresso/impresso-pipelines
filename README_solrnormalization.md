@@ -2,6 +2,7 @@
 Make sure you have installed the package as demonstrated in the main README.
 
 ```python
+from impresso_pipelines.solrnormalization import SolrNormalizationPipeline
 # Initialize the pipeline
 pipeline = SolrNormalizationPipeline()
 

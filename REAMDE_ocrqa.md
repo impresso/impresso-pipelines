@@ -1,6 +1,7 @@
 ### OCR QA Example
 Make sure you have installed the package as demostrated in the main README. 
 ```python
+from impresso_pipelines.ocrqa import OCRQAPipeline()
 # Initialize the pipeline
 ocrqa_pipeline = OCRQAPipeline()
 

@@ -55,6 +55,7 @@ The topic modeling results are formatted into **JSON output**. This output is li
 Make sure you have installed the package as demostrated in the main README. 
 
 ```python
+from impresso_pipelines.ldatopics import LDATopicsPipeline
 # Initialize the pipeline
 ldatopics_pipeline = LDATopicsPipeline()
 

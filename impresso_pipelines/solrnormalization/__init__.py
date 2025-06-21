@@ -2,7 +2,7 @@
 impresso_pipelines.solrnormalization: Tools for text normalization using Apache Lucene analyzers.
 
 Provides pipelines for language detection, tokenization, and normalization of historical newspaper texts.
-Supports multiple languages (e.g., German and French) with custom stopword handling and stemming.
+Supports multiple languages (e.g., German and French) with a potential of custom stopword handling and stemming.
 """
 
 try:
