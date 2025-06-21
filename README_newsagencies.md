@@ -1,5 +1,5 @@
 ### News Agencies Pipeline Example
-Make sure you have installed the package as demonstrated in the main README.
+Make sure you have installed the package as demonstrated in the main [README](README.md).
 
 ```python
 from impresso_pipelines.newsagencies import NewsAgenciesPipeline
