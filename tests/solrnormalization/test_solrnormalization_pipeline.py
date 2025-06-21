@@ -1,4 +1,14 @@
 import pytest
+
+pytest.importorskip("jpype")
+
+try:
+    import jpype
+    jpype.startJVM(classpath=["lucene_jars/*"])
+    from org.apache.lucene.analysis.standard import StandardAnalyzer
+except Exception:
+    pytest.skip("Lucene JARs not available or JVM failed to start", allow_module_level=True)
+
 from impresso_pipelines.solrnormalization.solrnormalization_pipeline import SolrNormalizationPipeline
 
 def test_solrnormalization_pipeline_basic():
