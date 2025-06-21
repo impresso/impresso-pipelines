@@ -52,6 +52,7 @@ class SolrNormalizationPipeline:
         """
         self.cleanup()
 
+
     def cleanup(self):
         """
         Clean up temporary directories and resources.
@@ -71,6 +72,21 @@ class SolrNormalizationPipeline:
                 shutil.rmtree(self.temp_dir, ignore_errors=True)
         except Exception as e:
             print(f"Warning: Cleanup failed: {e}")
+
+    def _load_snowball_stopwords(filepath):
+        stopwords = []
+        with open(filepath, encoding="utf-8") as f:
+            for line in f:
+                # Remove leading/trailing whitespace
+                line = line.strip()
+                # Skip comments and empty lines
+                if not line or line.startswith('|'):
+                    continue
+                # Keep only the first word (before any comment)
+                word = line.split('|')[0].strip()
+                if word:
+                    stopwords.append(word)
+        return stopwords
 
     def __del__(self):
         """
@@ -101,8 +117,11 @@ class SolrNormalizationPipeline:
         Generate stopword files for supported languages ('de', 'fr').
         """
         stopwords = {
-            "de": ["und", "oder", "aber", "der", "die", "das", "über", "den"],
-            "fr": ["le", "la", "les", "des", "et", "mais", "ou", "donc", "or", "ni", "car"]
+            "de": self._load_snowball_stopwords("german_stop.txt"),
+            "fr": self._load_snowball_stopwords("french_stop.txt"),
+            "en": ["a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into", "is",
+            "it", "no", "not", "of", "on", "or", "such", "that", "the", "their", "then", "there",
+            "these", "they", "this", "to", "was", "will", "with"]
         }
         for lang, words in stopwords.items():
             if not os.path.isfile(self.stopwords[lang]):
@@ -220,6 +239,8 @@ class SolrNormalizationPipeline:
             raise ValueError(f"Detected language '{detected_lang}' is not supported. Only 'de' and 'fr' are supported.")
             
         return detected_lang
+    
+
 
     def __call__(self, text: str, lang: Optional[str] = None) -> Dict[str, List[str]]:
         """
