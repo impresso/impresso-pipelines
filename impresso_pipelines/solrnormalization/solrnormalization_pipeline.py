@@ -7,6 +7,7 @@ from typing import List, Dict, Optional
 import tempfile
 import shutil
 from ..langident import LangIdentPipeline
+import importlib.resources
 
 class SolrNormalizationPipeline:
     """
@@ -117,11 +118,15 @@ class SolrNormalizationPipeline:
         Generate stopword files for supported languages ('de', 'fr').
         """
         stopwords = {
-            "de": self._load_snowball_stopwords("german_stop.txt"),
-            "fr": self._load_snowball_stopwords("french_stop.txt"),
+            "de": self._load_snowball_stopwords(
+                importlib.resources.files(__package__).joinpath("german_stop.txt")
+            ),
+            "fr": self._load_snowball_stopwords(
+                importlib.resources.files(__package__).joinpath("french_stop.txt")
+            ),
             "en": ["a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into", "is",
-            "it", "no", "not", "of", "on", "or", "such", "that", "the", "their", "then", "there",
-            "these", "they", "this", "to", "was", "will", "with"]
+                "it", "no", "not", "of", "on", "or", "such", "that", "the", "their", "then", "there",
+                "these", "they", "this", "to", "was", "will", "with"]
         }
         for lang, words in stopwords.items():
             if not os.path.isfile(self.stopwords[lang]):
