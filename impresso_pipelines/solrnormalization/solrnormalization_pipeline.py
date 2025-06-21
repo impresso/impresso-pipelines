@@ -76,14 +76,16 @@ class SolrNormalizationPipeline:
 
     def _load_snowball_stopwords(self, filepath):
         stopwords = []
-        with open(filepath, encoding="utf-8") as f:
+        # Support both Path and str
+        if hasattr(filepath, "open"):
+            f = filepath.open("r", encoding="utf-8")
+        else:
+            f = open(filepath, encoding="utf-8")
+        with f:
             for line in f:
-                # Remove leading/trailing whitespace
                 line = line.strip()
-                # Skip comments and empty lines
                 if not line or line.startswith('|'):
                     continue
-                # Keep only the first word (before any comment)
                 word = line.split('|')[0].strip()
                 if word:
                     stopwords.append(word)
