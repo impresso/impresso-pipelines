@@ -131,9 +131,10 @@ class SolrNormalizationPipeline:
                 "these", "they", "this", "to", "was", "will", "with"]
         }
         for lang, words in stopwords.items():
-            if not os.path.isfile(self.stopwords[lang]):
-                with open(self.stopwords[lang], "w", encoding="utf8") as f:
-                    f.write("\n".join(words))
+            if lang in self.stopwords:
+                if not os.path.isfile(self.stopwords[lang]):
+                    with open(self.stopwords[lang], "w", encoding="utf8") as f:
+                        f.write("\n".join(words))
 
     def _start_jvm(self):
         """
