@@ -1,3 +1,10 @@
+"""
+impresso_pipelines.newsagencies: Named entity recognition for identifying news agency mentions.
+
+Provides pipelines for token classification and chunk-based annotation of press agencies
+such as Reuters or Havas, including diagnostics and export options.
+"""
+
 try:
     import torch
     import transformers

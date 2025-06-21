@@ -1,3 +1,10 @@
+"""
+impresso_pipelines.ocrqa: Tools for assessing OCR quality in historical newspaper collections.
+
+Includes sentence- and article-level quality scoring components, as well as aggregate visualizations
+over time, by newspaper, or other metadata.
+"""
+
 try:
     import huggingface_hub
     import floret
