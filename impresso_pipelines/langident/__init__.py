@@ -1,3 +1,10 @@
+"""
+impresso_pipelines.langident: Tools for identifying languages in historical newspaper texts.
+
+Includes pipelines for applying language models (e.g., fastText/floret) at the article or paragraph level,
+designed for multilingual and noisy OCR input. Outputs include predictions, confidences, and optional diagnostics.
+"""
+
 try:
     import huggingface_hub
     import floret

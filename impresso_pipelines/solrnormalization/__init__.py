@@ -1,3 +1,10 @@
+"""
+impresso_pipelines.solrnormalization: Tools for text normalization using Apache Lucene analyzers.
+
+Provides pipelines for language detection, tokenization, and normalization of historical newspaper texts.
+Supports multiple languages (e.g., German and French) with custom stopword handling and stemming.
+"""
+
 try:
     import jpype
     # import pybloomfilter  # Change this to match what's actually needed
