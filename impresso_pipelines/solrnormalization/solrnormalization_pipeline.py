@@ -7,6 +7,7 @@ from typing import List, Dict, Optional
 import tempfile
 import shutil
 from ..langident import LangIdentPipeline
+import importlib.resources
 
 class SolrNormalizationPipeline:
     """
@@ -52,6 +53,7 @@ class SolrNormalizationPipeline:
         """
         self.cleanup()
 
+
     def cleanup(self):
         """
         Clean up temporary directories and resources.
@@ -71,6 +73,23 @@ class SolrNormalizationPipeline:
                 shutil.rmtree(self.temp_dir, ignore_errors=True)
         except Exception as e:
             print(f"Warning: Cleanup failed: {e}")
+
+    def _load_snowball_stopwords(self, filepath):
+        stopwords = []
+        # Support both Path and str
+        if hasattr(filepath, "open"):
+            f = filepath.open("r", encoding="utf-8")
+        else:
+            f = open(filepath, encoding="utf-8")
+        with f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('|'):
+                    continue
+                word = line.split('|')[0].strip()
+                if word:
+                    stopwords.append(word)
+        return stopwords
 
     def __del__(self):
         """
@@ -101,13 +120,18 @@ class SolrNormalizationPipeline:
         Generate stopword files for supported languages ('de', 'fr').
         """
         stopwords = {
-            "de": ["und", "oder", "aber", "der", "die", "das", "über", "den"],
-            "fr": ["le", "la", "les", "des", "et", "mais", "ou", "donc", "or", "ni", "car"]
+            "de": self._load_snowball_stopwords(
+                importlib.resources.files(__package__).joinpath("german_stop.txt")
+            ),
+            "fr": self._load_snowball_stopwords(
+                importlib.resources.files(__package__).joinpath("french_stop.txt")
+            )
         }
         for lang, words in stopwords.items():
-            if not os.path.isfile(self.stopwords[lang]):
-                with open(self.stopwords[lang], "w", encoding="utf8") as f:
-                    f.write("\n".join(words))
+            if lang in self.stopwords:
+                if not os.path.isfile(self.stopwords[lang]):
+                    with open(self.stopwords[lang], "w", encoding="utf8") as f:
+                        f.write("\n".join(words))
 
     def _start_jvm(self):
         """
@@ -220,6 +244,8 @@ class SolrNormalizationPipeline:
             raise ValueError(f"Detected language '{detected_lang}' is not supported. Only 'de' and 'fr' are supported.")
             
         return detected_lang
+    
+
 
     def __call__(self, text: str, lang: Optional[str] = None) -> Dict[str, List[str]]:
         """
