@@ -1,41 +1,42 @@
-# Python Package: [impresso-pipelines]
-![PyPI](https://img.shields.io/pypi/v/impresso-pipelines)
-![Python versions](https://img.shields.io/pypi/pyversions/impresso-pipelines)
-![Weekly Downloads](https://img.shields.io/pypi/dm/impresso-pipelines)
-![Contributors](https://img.shields.io/github/contributors/impresso/impresso-pipelines)
-![QA Workflow](https://github.com/impresso/impresso-pipelines/actions/workflows/qa.yml/badge.svg)
+# Python Package: `impresso-pipelines`
 
+[![PyPI](https://img.shields.io/pypi/v/impresso-pipelines)](https://pypi.org/project/impresso-pipelines/)
+[![Python versions](https://img.shields.io/pypi/pyversions/impresso-pipelines)](https://pypi.org/project/impresso-pipelines/)
+[![Weekly Downloads](https://img.shields.io/pypi/dm/impresso-pipelines)](https://pypi.org/project/impresso-pipelines/)
+[![Contributors](https://img.shields.io/github/contributors/impresso/impresso-pipelines)](https://github.com/impresso/impresso-pipelines/graphs/contributors)
+[![QA Workflow](https://github.com/impresso/impresso-pipelines/actions/workflows/qa.yml/badge.svg)](https://github.com/impresso/impresso-pipelines/actions/workflows/qa.yml)
 
-
+# Python Package `impresso-pipelines`
 
 ## Overview
-This repository contains a Python package designed for efficient and modular processing. Currently, it includes the following subpackages:
+This repository contains a Python package designed for modular and efficient text processing workflows. Currently, it includes the following subpackages:
 
-- **Language Identification Pipeline**: Detects the language of input text and provides a corresponding probability score.
-- **OCR QA Pipeline**: Evaluates the quality of OCR-processed text by calculating a score (0-1) representing the proportion of recognized words in the input text using a language-specific, efficient Bloom filter database.
-- **LDA Topic Modeling Pipeline**: Uses topic modeling to assign the most relevant topics to the input text. 
+- **Language Identification Pipeline**: Identifies the language of input text and returns a probability score.
+- **OCR QA Pipeline**: Assesses the quality of OCR text by estimating the proportion of recognized words (0–1), using efficient language-specific Bloom filters.
+- **LDA Topic Modeling Pipeline**: Soft clustering of input texts using LDA-based topic modeling. 
 - **News Agencies Pipeline**: Extracts and ranks news agency entities from text, providing relevance scores and optional links to Wikidata.
-- **Solrnormalization Pipeline**: Implements the normalization process used in Solr, a search platform, to standardize and preprocess text data for indexing and retrieval. 
-
+- **Lucene/Solr ormalization Pipeline**: Replicates Solr’s language-specific text normalization to clarify how input text is tokenized and indexed in impresso.
 
 
 ## Installation
-To install the package with all subpackages, use:
+To install the full package with all submodules:
 ```bash
-pip install "impresso_pipelines[all]"
+pip install "impresso-pipelines[all]"
 ```
+The `[all]` extra installs all dependencies required for each component.
 
-To install individual subpackages without any additional dependencies, use:
+
+To install individual modules without unnecessary dependencies, use:
 ```bash
-pip install "impresso_pipelines[langident]"         # Language Identification
-pip install "impresso_pipelines[ocrqa]"             # OCR QA
-pip install "impresso_pipelines[ldatopics]"         # LDA Topics
-pip install "impresso_pipelines[newsagencies]"      # News Agencies
-pip install "impresso_pipelines[solrnormalization]" # Solrnormalization
+pip install "impresso-pipelines[langident]"         # Language Identification
+pip install "impresso-pipelines[ocrqa]"             # OCR QA
+pip install "impresso-pipelines[ldatopics]"         # LDA Topics
+pip install "impresso-pipelines[newsagencies]"      # News Agencies
+pip install "impresso-pipelines[solrnormalization]" # Solr text normalization
 ```
 
 ## Usage
-Import and use the subpackages as follows:
+Each pipeline is instantiated from a corresponding class. 
 ```python
 from impresso_pipelines.langident import LangIdentPipeline
 from impresso_pipelines.ocrqa import OCRQAPipeline
@@ -44,18 +45,18 @@ from impresso_pipelines.newsagencies import NewsAgenciesPipeline
 from impresso_pipelines.solrnormalization import SolrNormalizationPipeline
 ```
 
-## Running the Pipeline examples
+## Pipeline Examples
 For usage examples, refer to the individual README files:
 
  - [Langident Pipeline](README_langident.md)
  - [OCR QA Pipeline](README_ocrqa.md)
  - [LDA Topics Pipeline](README_ldatopics.md)
  - [News Agencies Pipeline](README_newsagencies.md)
- - [Solrnormalization Pipeline](README_solrnormalization.md)
+ - [Solr normalization Pipeline](README_solrnormalization.md)
 
 
 
-Additional examples are available in the documentation notebooks:
+See also the interactive notebooks for further examples:
  - [langident_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/langident_pipeline_demo.ipynb)
  - [ocrqa_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/ocrqa_pipeline_demo.ipynb)
  - [ldatopics_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/ldatopics_pipeline_demo.ipynb)
@@ -63,7 +64,7 @@ Additional examples are available in the documentation notebooks:
  - [solrnormalization_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/solrnormalization_pipeline_demo.ipynb).
 
 ## Future Plans
-More Impresso functionality will be added to enhance functionality and broaden use cases.
+Additional functionality will be added to extend use cases and support further processing tasks.
 
 
 ## About Impresso
