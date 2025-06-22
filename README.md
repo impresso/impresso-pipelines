@@ -1,4 +1,12 @@
 # Python Package: [impresso-pipelines]
+![PyPI](https://img.shields.io/pypi/v/impresso-pipelines)
+![Python versions](https://img.shields.io/pypi/pyversions/impresso-pipelines)
+![Weekly Downloads](https://img.shields.io/pypi/dm/impresso-pipelines)
+![Contributors](https://img.shields.io/github/contributors/impresso/impresso-pipelines)
+![QA Workflow](https://github.com/impresso/impresso-pipelines/actions/workflows/qa.yml/badge.svg)
+
+
+
 
 ## Overview
 This repository contains a Python package designed for efficient and modular processing. Currently, it includes the following subpackages:
