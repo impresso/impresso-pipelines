@@ -42,4 +42,4 @@ jobs:
           poetry install --all-extras
       - name: Unit tests
         run: |
-          poetry run pytest
+          IMPRESSO_SKIP_JVM=1 poetry run pytest

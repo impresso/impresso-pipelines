@@ -139,6 +139,12 @@ class SolrNormalizationPipeline:
         """
         Start the JVM with the required classpath for Lucene libraries.
         """
+        # Allow skipping JVM startup for test environments
+        import os
+        if os.environ.get("IMPRESSO_SKIP_JVM", "0") == "1":
+            # For test environments: skip JVM startup and Lucene class check
+            return
+
         if not jpype.isJVMStarted():
             if self._external_lucene_dir:
                 import glob
