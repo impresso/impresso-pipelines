@@ -29,9 +29,9 @@ jobs:
       - name: Download Lucene JARs
         run: |
           mkdir -p lucene_jars
-          curl -L -o lucene_jars/lucene-core-9.9.2.jar https://repo1.maven.org/maven2/org/apache/lucene/lucene-core/9.9.2/lucene-core-9.9.2.jar
-          curl -L -o lucene_jars/lucene-analyzers-common-9.9.2.jar https://repo1.maven.org/maven2/org/apache/lucene/lucene-analyzers-common/9.9.2/lucene-analyzers-common-9.9.2.jar
-          curl -L -o lucene_jars/lucene-analysis-custom-9.9.2.jar https://repo1.maven.org/maven2/org/apache/lucene/lucene-analysis-custom/9.9.2/lucene-analysis-custom-9.9.2.jar
+          curl -L -o lucene_jars/lucene-core-9.3.0.jar https://repo1.maven.org/maven2/org/apache/lucene/lucene-core/9.3.0/lucene-core-9.3.0.jar
+          curl -L -o lucene_jars/lucene-analyzers-common-9.3.0.jar https://repo1.maven.org/maven2/org/apache/lucene/lucene-analyzers-common/9.3.0/lucene-analyzers-common-9.3.0.jar
+          curl -L -o lucene_jars/lucene-analysis-custom-9.3.0.jar https://repo1.maven.org/maven2/org/apache/lucene/lucene-analysis-custom/9.3.0/lucene-analysis-custom-9.3.0.jar
       - name: Set CLASSPATH
         run: echo "CLASSPATH=$PWD/lucene_jars/*" >> $GITHUB_ENV
       - uses: abatilo/actions-poetry@v2
