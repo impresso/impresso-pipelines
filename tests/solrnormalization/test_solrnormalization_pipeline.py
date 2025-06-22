@@ -18,19 +18,29 @@ def test_solrnormalization_pipeline_error_on_unsupported_language():
 @pytest.fixture(scope="session")
 def ensure_jvm():
     import jpype
-    # Find all JARs in lucene_jars directory
     jar_dir = "lucene_jars"
     jar_paths = glob.glob(os.path.join(jar_dir, "*.jar"))
+    print(f"[DEBUG] Looking for Lucene JARs in: {jar_dir}")
+    print(f"[DEBUG] Found JARs: {jar_paths}")
+    for jar in jar_paths:
+        print(f"[DEBUG] JAR exists: {jar} -> {os.path.exists(jar)}")
+    if not jar_paths:
+        print("[DEBUG] No Lucene JARs found!")
     if not jpype.isJVMStarted():
         try:
             jpype.startJVM(classpath=jar_paths)
-        except RuntimeError:
+            print("[DEBUG] JVM started successfully.")
+        except RuntimeError as e:
+            print(f"[DEBUG] JVM failed to start: {e}")
             pytest.skip("Lucene JARs not available or JVM failed to start", allow_module_level=True)
+    # JVM is started, check if Lucene classes are importable
     try:
         from org.apache.lucene.analysis.standard import StandardAnalyzer
         from org.apache.lucene.analysis.custom import CustomAnalyzer
-    except ImportError:
-        pytest.skip("Lucene JARs not available or JVM failed to start", allow_module_level=True)
+        print("[DEBUG] Lucene classes imported successfully.")
+    except ImportError as e:
+        print(f"[DEBUG] Lucene classes not importable: {e}")
+        pytest.skip("Lucene classes not importable in current JVM/classpath. JVM may have been started by another test with a different classpath.", allow_module_level=True)
 
 @pytest.mark.usefixtures("ensure_jvm")
 def test_solrnormalization_pipeline_basic():
