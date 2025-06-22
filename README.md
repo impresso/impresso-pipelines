@@ -1,4 +1,11 @@
-# Python Package `impresso-pipelines`
+# Python Package: `impresso-pipelines`
+
+[![PyPI](https://img.shields.io/pypi/v/impresso-pipelines)](https://pypi.org/project/impresso-pipelines/)
+[![Python versions](https://img.shields.io/pypi/pyversions/impresso-pipelines)](https://pypi.org/project/impresso-pipelines/)
+[![Weekly Downloads](https://img.shields.io/pypi/dm/impresso-pipelines)](https://pypi.org/project/impresso-pipelines/)
+[![Contributors](https://img.shields.io/github/contributors/impresso/impresso-pipelines)](https://github.com/impresso/impresso-pipelines/graphs/contributors)
+[![QA Workflow](https://github.com/impresso/impresso-pipelines/actions/workflows/qa.yml/badge.svg)](https://github.com/impresso/impresso-pipelines/actions/workflows/qa.yml)
+
 
 ## Overview
 This repository contains a Python package designed for modular and efficient text processing workflows. Currently, it includes the following subpackages:
