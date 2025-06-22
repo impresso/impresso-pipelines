@@ -6,12 +6,12 @@ from impresso_pipelines.solrnormalization.solrnormalization_pipeline import Solr
 
 def test_solrnormalization_pipeline_importable():
     """Test that SolrNormalizationPipeline can be imported and instantiated."""
-    pipeline = SolrNormalizationPipeline()
+    pipeline = SolrNormalizationPipeline(lucene_dir="lucene_jars")
     assert pipeline is not None
 
 def test_solrnormalization_pipeline_error_on_unsupported_language():
     """Test that unsupported language raises ValueError (no JVM/Lucene needed)."""
-    pipeline = SolrNormalizationPipeline()
+    pipeline = SolrNormalizationPipeline(lucene_dir="lucene_jars")
     with pytest.raises(ValueError):
         pipeline("This is English text.", lang="en")
 
@@ -44,7 +44,7 @@ def ensure_jvm():
 
 @pytest.mark.usefixtures("ensure_jvm")
 def test_solrnormalization_pipeline_basic():
-    pipeline = SolrNormalizationPipeline()
+    pipeline = SolrNormalizationPipeline(lucene_dir="lucene_jars")
     de_text = "Der Hund läuft schnell durch den Wald und über die Wiese."
 
     result = pipeline(de_text)
@@ -61,7 +61,7 @@ def test_solrnormalization_pipeline_basic():
 
 @pytest.mark.usefixtures("ensure_jvm")
 def test_solrnormalization_pipeline_with_language():
-    pipeline = SolrNormalizationPipeline()
+    pipeline = SolrNormalizationPipeline(lucene_dir="lucene_jars")
     fr_text = "Le chien court rapidement à travers la forêt et sur la prairie."
 
     result = pipeline(fr_text, lang="fr")
@@ -78,7 +78,7 @@ def test_solrnormalization_pipeline_with_language():
 
 @pytest.mark.usefixtures("ensure_jvm")
 def test_solrnormalization_pipeline_detect_language():
-    pipeline = SolrNormalizationPipeline()
+    pipeline = SolrNormalizationPipeline(lucene_dir="lucene_jars")
     de_text = "Der Hund läuft schnell durch den Wald und über die Wiese."
 
     result = pipeline(de_text)
@@ -92,7 +92,7 @@ def test_solrnormalization_pipeline_detect_language():
 
 @pytest.mark.usefixtures("ensure_jvm")
 def test_solrnormalization_pipeline_detect_language_fr():
-    pipeline = SolrNormalizationPipeline()
+    pipeline = SolrNormalizationPipeline(lucene_dir="lucene_jars")
     fr_text = "Le chien court rapidement à travers la forêt et sur la prairie."
 
     result = pipeline(fr_text)

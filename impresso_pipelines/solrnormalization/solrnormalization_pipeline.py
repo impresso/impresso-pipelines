@@ -17,10 +17,12 @@ class SolrNormalizationPipeline:
 
     LUCENE_VERSION = "9.3.0"
 
-    def __init__(self):
+    def __init__(self, lucene_dir: Optional[str] = None):
         """
         Initialize the pipeline, setting up temporary directories, downloading dependencies, and preparing stopwords.
+        If lucene_dir is provided, use JARs from that directory instead of downloading.
         """
+        self._external_lucene_dir = lucene_dir
         # Create temporary directory
         self.temp_dir = tempfile.mkdtemp(prefix="solrnorm_")
         self.lib_dir = os.path.join(self.temp_dir, "lib")
@@ -32,9 +34,9 @@ class SolrNormalizationPipeline:
             "lucene-core": f"https://repo1.maven.org/maven2/org/apache/lucene/lucene-core/{self.LUCENE_VERSION}/lucene-core-{self.LUCENE_VERSION}.jar",
             "lucene-analysis-common": f"https://repo1.maven.org/maven2/org/apache/lucene/lucene-analysis-common/{self.LUCENE_VERSION}/lucene-analysis-common-{self.LUCENE_VERSION}.jar"
         }
-        
         self._setup_environment()
-        self._download_dependencies()
+        if not self._external_lucene_dir:
+            self._download_dependencies()
         self._create_stopwords()
         self._analyzers = {}
         self._lang_detector = None
@@ -138,11 +140,18 @@ class SolrNormalizationPipeline:
         Start the JVM with the required classpath for Lucene libraries.
         """
         if not jpype.isJVMStarted():
-            jar_paths = [os.path.join(self.lib_dir, os.path.basename(url)) 
-                        for url in self.jar_urls.values()]
-            print("📦 Starting JVM with classpath:")
-            for j in jar_paths:
-                print(" -", j)
+            if self._external_lucene_dir:
+                import glob
+                jar_paths = glob.glob(os.path.join(self._external_lucene_dir, "*.jar"))
+                print("📦 Starting JVM with external lucene_dir classpath:")
+                for j in jar_paths:
+                    print(" -", j)
+            else:
+                jar_paths = [os.path.join(self.lib_dir, os.path.basename(url)) 
+                             for url in self.jar_urls.values()]
+                print("📦 Starting JVM with downloaded classpath:")
+                for j in jar_paths:
+                    print(" -", j)
             jpype.startJVM(classpath=jar_paths)
 
     def _build_analyzer(self, lang: str):
