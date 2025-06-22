@@ -153,6 +153,15 @@ class SolrNormalizationPipeline:
                 for j in jar_paths:
                     print(" -", j)
             jpype.startJVM(classpath=jar_paths)
+        else:
+            # JVM already started, check if Lucene classes are available
+            try:
+                from org.apache.lucene.analysis.standard import StandardAnalyzer
+                from org.apache.lucene.analysis.custom import CustomAnalyzer
+            except ImportError as e:
+                print("[ERROR] JVM is already started but Lucene classes are not available in the classpath.")
+                print("[ERROR] This usually happens if another library started the JVM without Lucene jars.")
+                raise RuntimeError("JVM started without Lucene jars. Please ensure no other code starts the JVM before SolrNormalizationPipeline.") from e
 
     def _build_analyzer(self, lang: str):
         """
