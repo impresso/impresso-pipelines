@@ -138,18 +138,21 @@ class SolrNormalizationPipeline:
     def _start_jvm(self):
         """
         Start the JVM with the required classpath for Lucene libraries.
-        Now a no-op if JVM is already started (handled by conftest.py).
         """
-        import jpype
-        if jpype.isJVMStarted():
-            return
-        if self._external_lucene_dir:
-            import glob
-            jar_paths = glob.glob(os.path.join(self._external_lucene_dir, "*.jar"))
-        else:
-            jar_paths = [os.path.join(self.lib_dir, os.path.basename(url)) 
-                         for url in self.jar_urls.values()]
-        jpype.startJVM(classpath=jar_paths)
+        if not jpype.isJVMStarted():
+            if self._external_lucene_dir:
+                import glob
+                jar_paths = glob.glob(os.path.join(self._external_lucene_dir, "*.jar"))
+                print("📦 Starting JVM with external lucene_dir classpath:")
+                for j in jar_paths:
+                    print(" -", j)
+            else:
+                jar_paths = [os.path.join(self.lib_dir, os.path.basename(url)) 
+                             for url in self.jar_urls.values()]
+                print("📦 Starting JVM with downloaded classpath:")
+                for j in jar_paths:
+                    print(" -", j)
+            jpype.startJVM(classpath=jar_paths)
 
     def _build_analyzer(self, lang: str):
         """
