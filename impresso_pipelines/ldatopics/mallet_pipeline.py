@@ -38,9 +38,16 @@ class LDATopicsPipeline:
             mallet_dir = self.setup_mallet_jars()  # Use Hugging Face caching
             # need to add mallet/lib since thats how it saves from hf_hub_download
             classpath = f"{mallet_dir}/mallet.jar:{mallet_dir}/mallet-deps.jar"
-            
             # Start JVM with Mallet's classpath
             jpype.startJVM(jpype.getDefaultJVMPath(), f"-Djava.class.path={classpath}")
+        else:
+            # JVM already started, check if Mallet classes are available
+            try:
+                from cc.mallet.classify.tui import Csv2Vectors
+            except ImportError as e:
+                print("[ERROR] JVM is already started but Mallet classes are not available in the classpath.")
+                print("[ERROR] This usually happens if another library started the JVM without Mallet jars.")
+                raise RuntimeError("JVM started without Mallet jars. Please ensure no other code starts the JVM before LDATopicsPipeline.") from e
 
     
     def setup_mallet_jars(self):
