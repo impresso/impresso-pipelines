@@ -8,7 +8,7 @@ over time, by newspaper, or other metadata.
 try:
     import huggingface_hub
     import floret
-    import pybloomfilter3  
+    import pybloomfilter
     
     # Only import this after checking dependencies
     from .ocrqa_pipeline import OCRQAPipeline
