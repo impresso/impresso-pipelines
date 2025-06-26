@@ -1,7 +1,7 @@
 from typing import List, Dict, Union, Optional
 import unicodedata
 from huggingface_hub import hf_hub_download, list_repo_files
-from pybloomfilter import BloomFilter
+from pybloomfilter3 import BloomFilter  # changed import to pybloomfilter3
 import re
 from functools import lru_cache
 
