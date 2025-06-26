@@ -11,7 +11,7 @@ cython = "*"
 numpy = "1.26.4"
 huggingface_hub = { version = "*", optional = true }
 floret = { version = "*", optional = true }
-pybloomfiltermmap3 = { version = "*", optional = true }
+pybloomfilter3 = { version = "*", optional = true }
 pysolr = "*"
 
 jpype1 = { version = "^1.4.1", optional = true }
@@ -26,13 +26,14 @@ homepage = "https://github.com/impresso/impresso-pipelines"
 
 [tool.poetry.extras]
 langident = ["huggingface_hub", "floret"]
-ocrqa = ["pybloomfiltermmap3", "huggingface_hub", "floret"]
-ldatopics = ["pybloomfiltermmap3", "huggingface_hub", "floret", "jpype1", "smart_open", "boto3", "python-dotenv", "spacy", "jsonschema"]
+ocrqa = ["pybloomfilter3", "huggingface_hub", "floret"]
+ldatopics = ["huggingface_hub", "floret", "jpype1", "smart_open", "boto3", "python-dotenv", "spacy", "jsonschema"]
 newsagencies = ["transformers", "pytorch"]
 solrnormalization = ["jpype1", "huggingface_hub", "floret", "pysolr"]
-all = ["pybloomfiltermmap3", "huggingface_hub", "floret", "jpype1", "smart_open", "boto3", "python-dotenv", "spacy", "transformers", "pytorch", "jsonschema"]
+all = ["pybloomfilter3", "huggingface_hub", "floret", "jpype1", "smart_open", "boto3", "python-dotenv", "spacy", "transformers", "pytorch", "jsonschema"]
 
 [tool.poetry.dev-dependencies]
+pybloomfilter3 = "*"
 pytest = "^7.2"
 jsonschema = "^4.23.0"
 pytest-lazy-fixture = "^0.6.3"
