@@ -8,11 +8,12 @@ import tempfile
 import shutil
 from ..langident import LangIdentPipeline
 import importlib.resources
+from .lang_configs import LANG_CONFIGS
 
 class SolrNormalizationPipeline:
     """
     Pipeline for text normalization using Apache Lucene analyzers.
-    Handles language detection, tokenization, and normalization for supported languages ('de', 'fr').
+    Handles language detection, tokenization, and normalization for supported languages ('de', 'fr', 'el', 'ru').
     """
 
     LUCENE_VERSION = "9.3.0"
@@ -20,13 +21,14 @@ class SolrNormalizationPipeline:
     def __init__(self):
         """
         Initialize the pipeline, setting up temporary directories, downloading dependencies, and preparing stopwords.
+        Supports all languages defined in LANG_CONFIGS.
         """
         # Create temporary directory
         self.temp_dir = tempfile.mkdtemp(prefix="solrnorm_")
         self.lib_dir = os.path.join(self.temp_dir, "lib")
         self.stopwords = {
-            "de": os.path.join(self.temp_dir, "stopwords_de.txt"),
-            "fr": os.path.join(self.temp_dir, "stopwords_fr.txt")
+            lang: os.path.join(self.temp_dir, f"stopwords_{lang}.txt")
+            for lang in LANG_CONFIGS
         }
         self.jar_urls = {
             "lucene-core": f"https://repo1.maven.org/maven2/org/apache/lucene/lucene-core/{self.LUCENE_VERSION}/lucene-core-{self.LUCENE_VERSION}.jar",
@@ -117,16 +119,15 @@ class SolrNormalizationPipeline:
 
     def _create_stopwords(self):
         """
-        Generate stopword files for supported languages ('de', 'fr').
+        Generate stopword files for supported languages.
         """
-        stopwords = {
-            "de": self._load_snowball_stopwords(
-                importlib.resources.files(__package__).joinpath("german_stop.txt")
-            ),
-            "fr": self._load_snowball_stopwords(
-                importlib.resources.files(__package__).joinpath("french_stop.txt")
-            )
-        }
+        stopwords = {}
+        for lang, config in LANG_CONFIGS.items():
+            stopwords_file = config.get("stopwords_file")
+            if stopwords_file:
+                stopwords[lang] = self._load_snowball_stopwords(
+                    importlib.resources.files(__package__).joinpath(stopwords_file)
+                )
         for lang, words in stopwords.items():
             if lang in self.stopwords:
                 if not os.path.isfile(self.stopwords[lang]):
@@ -147,7 +148,7 @@ class SolrNormalizationPipeline:
 
     def _build_analyzer(self, lang: str):
         """
-        Build a custom Lucene analyzer for the specified language.
+        Build a custom Lucene analyzer for the specified language using LANG_CONFIGS.
         
         Args:
             lang (str): Language code ('de' or 'fr').
@@ -162,39 +163,33 @@ class SolrNormalizationPipeline:
         from java.nio.file import Paths
         from java.util import HashMap
 
-        stop_params = HashMap()
-        stop_params.put("ignoreCase", "true")
-        stop_params.put("words", self.stopwords[lang])  # Updated to use instance stopwords path
-        stop_params.put("format", "wordset")
+        if lang not in LANG_CONFIGS:
+            raise ValueError(f"Unsupported language: {lang}")
 
+        config = LANG_CONFIGS[lang]
         builder = CustomAnalyzer.builder(Paths.get("."))
 
-        if lang == "de":
-            return (builder
-                .withTokenizer("standard")
-                .addTokenFilter("lowercase")
-                .addTokenFilter("stop", stop_params)
-                .addTokenFilter("germanNormalization")
-                .addTokenFilter("asciifolding")
-                .addTokenFilter("germanMinimalStem")
-                .build()
-            )
-        elif lang == "fr":
-            elision_params = HashMap()
-            elision_params.put("ignoreCase", "true")
-            elision_params.put("articles", self.stopwords["fr"])
-
-            return (builder
-                .withTokenizer("standard")
-                .addTokenFilter("elision", elision_params)
-                .addTokenFilter("lowercase")
-                .addTokenFilter("stop", stop_params)
-                .addTokenFilter("asciifolding")
-                .addTokenFilter("frenchMinimalStem")
-                .build()
-            )
-        else:
-            raise ValueError(f"Unsupported language: {lang}")
+        # Track if stop or elision params are needed
+        for step in config["analyzer_pipeline"]:
+            if step["type"] == "tokenizer":
+                builder = builder.withTokenizer(step["name"])
+            elif step["type"] == "tokenfilter":
+                if step["name"] == "stop":
+                    stop_params = HashMap()
+                    for k, v in config.get("stop_params", {}).items():
+                        stop_params.put(k, v)
+                    stop_params.put("words", self.stopwords[lang])
+                    builder = builder.addTokenFilter("stop", stop_params)
+                elif step["name"] == "elision":
+                    elision_params = HashMap()
+                    for k, v in config.get("elision_params", {}).items():
+                        elision_params.put(k, v)
+                    # For French, articles param is the stopword file
+                    elision_params.put("articles", self.stopwords[lang])
+                    builder = builder.addTokenFilter("elision", elision_params)
+                else:
+                    builder = builder.addTokenFilter(step["name"])
+        return builder.build()
 
     def _analyze_text(self, analyzer, text: str) -> List[str]:
         """
@@ -224,15 +219,7 @@ class SolrNormalizationPipeline:
     def _detect_language(self, text: str) -> str:
         """
         Detect the language of the input text using LangIdentPipeline.
-        
-        Args:
-            text (str): Input text for language detection.
-        
-        Returns:
-            Detected language code ('de' or 'fr').
-        
-        Raises:
-            ValueError: If the detected language is unsupported.
+        Returns a language code supported in LANG_CONFIGS.
         """
         if self._lang_detector is None:
             self._lang_detector = LangIdentPipeline()
@@ -240,20 +227,21 @@ class SolrNormalizationPipeline:
         result = self._lang_detector(text)
         detected_lang = result['language']
         
-        if detected_lang not in self.stopwords:
-            raise ValueError(f"Detected language '{detected_lang}' is not supported. Only 'de' and 'fr' are supported.")
-            
+        if detected_lang not in LANG_CONFIGS:
+            raise ValueError(f"Detected language '{detected_lang}' is not supported. Supported: {list(LANG_CONFIGS.keys())}")
         return detected_lang
     
 
 
-    def __call__(self, text: str, lang: Optional[str] = None) -> Dict[str, List[str]]:
+    def __call__(self, text: str, lang: Optional[str] = None, diagnostics: Optional[bool] = False) -> Dict[str, List[str]]:
         """
         Process text through the normalization pipeline.
+        Supports all languages defined in LANG_CONFIGS.
         
         Args:
             text (str): Input text to normalize.
             lang (str, optional): Language code ('de' or 'fr'). If not provided, language is detected automatically.
+            diagnostics (bool, optional): If True, returns additional diagnostic information (not implemented).
         
         Returns:
             Dict containing normalized tokens and detected language.
@@ -263,18 +251,33 @@ class SolrNormalizationPipeline:
         """
         # Detect language if not specified
         detected_lang = self._detect_language(text) if lang is None else lang
-        
-        # Validate language support
-        if detected_lang not in self.stopwords:
-            raise ValueError(f"Unsupported language: '{detected_lang}'. Only {', '.join(self.stopwords.keys())} are supported.")
+
+        if detected_lang not in LANG_CONFIGS:
+            raise ValueError(f"Unsupported language: '{detected_lang}'. Supported: {', '.join(LANG_CONFIGS.keys())}")
 
         self._start_jvm()
-        
+
         if detected_lang not in self._analyzers:
             self._analyzers[detected_lang] = self._build_analyzer(detected_lang)
-            
+
         tokens = self._analyze_text(self._analyzers[detected_lang], text)
-        
+
+        if diagnostics:
+            stopword_file = LANG_CONFIGS[detected_lang].get("stopwords_file")
+            if stopword_file is None:
+                stopwords_set = set()
+            else:
+                stopwords_set = set(self._load_snowball_stopwords(
+                    importlib.resources.files(__package__).joinpath(stopword_file)
+                ))
+            text_tokens = set(word.lower() for word in text.split())
+            detected = [sw for sw in stopwords_set if sw.lower() in text_tokens]
+            return {
+                "language": detected_lang,
+                "tokens": tokens,
+                "stopwords_detected": detected
+            }
+
         return {
             "language": detected_lang,
             "tokens": tokens
