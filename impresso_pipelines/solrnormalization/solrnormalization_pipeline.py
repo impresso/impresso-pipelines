@@ -13,7 +13,7 @@ from .lang_configs import LANG_CONFIGS
 class SolrNormalizationPipeline:
     """
     Pipeline for text normalization using Apache Lucene analyzers.
-    Handles language detection, tokenization, and normalization for supported languages ('de', 'fr').
+    Handles language detection, tokenization, and normalization for supported languages ('de', 'fr', 'el', 'ru').
     """
 
     LUCENE_VERSION = "9.3.0"
@@ -21,6 +21,7 @@ class SolrNormalizationPipeline:
     def __init__(self):
         """
         Initialize the pipeline, setting up temporary directories, downloading dependencies, and preparing stopwords.
+        Supports all languages defined in LANG_CONFIGS.
         """
         # Create temporary directory
         self.temp_dir = tempfile.mkdtemp(prefix="solrnorm_")
@@ -218,15 +219,7 @@ class SolrNormalizationPipeline:
     def _detect_language(self, text: str) -> str:
         """
         Detect the language of the input text using LangIdentPipeline.
-        
-        Args:
-            text (str): Input text for language detection.
-        
-        Returns:
-            Detected language code ('de' or 'fr').
-        
-        Raises:
-            ValueError: If the detected language is unsupported.
+        Returns a language code supported in LANG_CONFIGS.
         """
         if self._lang_detector is None:
             self._lang_detector = LangIdentPipeline()
@@ -243,6 +236,7 @@ class SolrNormalizationPipeline:
     def __call__(self, text: str, lang: Optional[str] = None, diagnostics: Optional[bool] = False) -> Dict[str, List[str]]:
         """
         Process text through the normalization pipeline.
+        Supports all languages defined in LANG_CONFIGS.
         
         Args:
             text (str): Input text to normalize.
