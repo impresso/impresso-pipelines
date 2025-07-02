@@ -1,5 +1,7 @@
 ## Exaplanation of LDATopics Pipeline
 
+> **Note:** For more documentation and usage details, see the inline docstrings and comments in the code.
+
 ### Diagram
 ```mermaid
 flowchart TD
@@ -87,4 +89,4 @@ print(result)
   'topic_model_description': 'https://huggingface.co/impresso-project/mallet-topic-inferencer/resolve/main/models/tm/tm-de-all-v2.0.topic_model_topic_description.jsonl.bz2'}]
 ```
 
-For a more details about the usage and the possibilities that this pipeline provides, please check out our demo [notebook](https://github.com/impresso/impresso-datalab-notebooks/blob/main/annotate/ldatopics_pipeline_demo.ipynb). 
+For a more details about the usage and the possibilities that this pipeline provides, please check out our demo [notebook](https://github.com/impresso/impresso-datalab-notebooks/blob/main/annotate/ldatopics_pipeline_demo.ipynb).

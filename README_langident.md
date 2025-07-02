@@ -1,5 +1,8 @@
 ### Language Identification Example
 Make sure the package is installed as shown in the main [README](README.md).
+
+> **Note:** For more documentation and usage details, see the inline docstrings and comments in the code.
+
 ```python
 from impresso_pipelines.langident import LangIdentPipeline
 # Initialize the pipeline
@@ -31,4 +34,4 @@ print(result)
 The score represents the model’s confidence (as a probability) in the detected language.
 
 
-For more details about usage and available features, see the demo [notebook](https://github.com/impresso/impresso-datalab-notebooks/blob/main/annotate/langident_pipeline_demo.ipynb). 
+For more details about usage and available features, see the demo [notebook](https://github.com/impresso/impresso-datalab-notebooks/blob/main/annotate/langident_pipeline_demo.ipynb).

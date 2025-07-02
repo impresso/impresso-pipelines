@@ -1,6 +1,8 @@
 ### Solr Normalization Example
 Make sure you have installed the package as demonstrated in the main [README](README.md).
 
+> **Note:** For more documentation and usage details, see the inline docstrings and comments in the code.
+
 ```python
 from impresso_pipelines.solrnormalization import SolrNormalizationPipeline
 # Initialize the pipeline
