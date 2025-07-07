@@ -1,9 +1,14 @@
 [tool.poetry]
 name = "impresso-pipelines"
-version = "0.4.6.3"
+version = "0.4.6.4"
 description = "A custom package containing multiple pipelines simplifying reproducibility of impresso steps"
 authors = ["Glebs Vinarskis <gleb.vinarskis@gmail.com>"]
 readme = "README.md"
+
+packages = [
+    { include = "impresso_pipelines" }
+]
+
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.12"
