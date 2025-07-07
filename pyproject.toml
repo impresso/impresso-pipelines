@@ -5,6 +5,11 @@ description = "A custom package containing multiple pipelines simplifying reprod
 authors = ["Glebs Vinarskis <gleb.vinarskis@gmail.com>"]
 readme = "README.md"
 
+packages = [
+    { include = "impresso_pipelines" }
+]
+
+
 [tool.poetry.dependencies]
 python = ">=3.11,<3.12"
 cython = "*"
