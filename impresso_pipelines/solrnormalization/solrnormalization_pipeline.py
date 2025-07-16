@@ -275,7 +275,8 @@ class SolrNormalizationPipeline:
             return {
                 "language": detected_lang,
                 "tokens": tokens,
-                "stopwords_detected": detected
+                "stopwords_detected": detected,
+                "analyzer_pipeline": LANG_CONFIGS[detected_lang].get("analyzer_pipeline", [])
             }
 
         return {
