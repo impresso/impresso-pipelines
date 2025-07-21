@@ -347,6 +347,9 @@ class NewsAgenciesPipeline:
         self.model = NewsAgencyTokenClassifier.from_pretrained(model_id, config=config)
         self.tokenizer = AutoTokenizer.from_pretrained(model_id)
         
+        # Set model to evaluation mode for inference
+        self.model.eval()
+        
         # Determine device once
         if torch.cuda.is_available():
             device = 0
@@ -378,6 +381,9 @@ class NewsAgenciesPipeline:
         Returns:
             Dict[str, Any]: Extracted entities and summary.
         """
+        # Ensure model is in evaluation mode (safety measure)
+        self.model.eval()
+        
         # Use provided min_relevance or fall back to default
         if min_relevance is not None and min_relevance != self.ner.min_score:
             # Update the pipeline's min_score if different from current
