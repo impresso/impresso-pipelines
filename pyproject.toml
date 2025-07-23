@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "impresso-pipelines"
-version = "0.4.6.7"
+version = "0.4.6.8"
 description = "A custom package containing multiple pipelines simplifying reproducibility of impresso steps"
 authors = ["Glebs Vinarskis <gleb.vinarskis@gmail.com>"]
 readme = "README.md"
