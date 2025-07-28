@@ -324,53 +324,74 @@ class NewsAgenciesPipeline:
     A pipeline for extracting news agency entities from text.
 
     Attributes:
-        None
+        model: Pre-loaded token classification model.
+        tokenizer: Pre-loaded tokenizer.
+        ner: Pre-loaded NER pipeline.
+        model_id: Model identifier used for loading.
     """
 
-    def __init__(self):
+    def __init__(self, model_id: str = "impresso-project/ner-newsagency-bert-multilingual", 
+                 min_relevance: float = 0.1):
         """
-        Initialize the pipeline.
-        """
-        pass
-
-    def __call__(self, input_text: str, min_relevance: float = 0.1, diagnostics: bool = False, 
-                 model_id: str = "impresso-project/ner-newsagency-bert-multilingual", 
-                 suppress_entities: Optional[Sequence[str]] = []) -> Dict[str, Any]:
-        """
-        Run the pipeline to extract entities from text.
-
+        Initialize the pipeline with pre-loaded models and components.
+        
         Args:
-            input_text (str): Input text for processing.
-            min_relevance (float): Minimum confidence score for filtering entities.
-            diagnostics (bool): Whether to include diagnostics in the output.
             model_id (str): Model identifier.
-            suppress_entities (Optional[Sequence[str]]): Entities to suppress.
-
-        Returns:
-            Dict[str, Any]: Extracted entities and summary.
+            min_relevance (float): Default minimum confidence score for filtering entities.
         """
-        # suppress_entities = suppress_entities or []
-        suppress_entities = suppress_entities + ['org.ent.pressagency.unk', 'ag', 'pers.ind.articleauthor']
+        self.model_id = model_id
+        self.default_min_relevance = min_relevance
+        
+        # Load model configuration and components once
         config = AutoConfig.from_pretrained(model_id)
-        model = NewsAgencyTokenClassifier.from_pretrained(model_id, config=config)
-
-        tokenizer = AutoTokenizer.from_pretrained(model_id)
-
+        self.model = NewsAgencyTokenClassifier.from_pretrained(model_id, config=config)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_id)
+        
+        # Set model to evaluation mode for inference
+        self.model.eval()
+        
+        # Determine device once
         if torch.cuda.is_available():
             device = 0
         elif torch.backends.mps.is_available():
             device = "mps"
         else:
             device = -1
-
-        ner = ChunkAwareTokenClassification(
-            model=model,
-            tokenizer=tokenizer,
+        
+        # Initialize NER pipeline once
+        self.ner = ChunkAwareTokenClassification(
+            model=self.model,
+            tokenizer=self.tokenizer,
             min_score=min_relevance,
             device=device,
         )
 
-        entities = ner(input_text)
+    def __call__(self, input_text: str, min_relevance: Optional[float] = None, 
+                 diagnostics: bool = False, suppress_entities: Optional[Sequence[str]] = []) -> Dict[str, Any]:
+        """
+        Run the pipeline to extract entities from text.
+
+        Args:
+            input_text (str): Input text for processing.
+            min_relevance (Optional[float]): Minimum confidence score for filtering entities. 
+                                           If None, uses the default set during initialization.
+            diagnostics (bool): Whether to include diagnostics in the output.
+            suppress_entities (Optional[Sequence[str]]): Entities to suppress.
+
+        Returns:
+            Dict[str, Any]: Extracted entities and summary.
+        """
+        # Ensure model is in evaluation mode (safety measure)
+        self.model.eval()
+        
+        # Use provided min_relevance or fall back to default
+        if min_relevance is not None and min_relevance != self.ner.min_score:
+            # Update the pipeline's min_score if different from current
+            self.ner.min_score = min_relevance
+        
+        suppress_entities = suppress_entities + ['org.ent.pressagency.unk', 'ag', 'pers.ind.articleauthor']
+
+        entities = self.ner(input_text)
 
         SUPPRESS = frozenset(suppress_entities)
 

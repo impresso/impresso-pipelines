@@ -8,6 +8,7 @@ such as Reuters or Havas, including diagnostics and export options.
 try:
     import torch
     import transformers
+    import torchvision
    
 
     # Only import this after checking dependencies

@@ -1,23 +1,37 @@
 ### Language Identification Example
-Make sure you have installed the package as demostrated in the main [README](README.md). 
+Make sure the package is installed as shown in the main [README](README.md).
+
+> **Note:** For more documentation and usage details, see the inline docstrings and comments in the code.
+
 ```python
 from impresso_pipelines.langident import LangIdentPipeline
 # Initialize the pipeline
 lang_pipeline = LangIdentPipeline()
 
 # Example text in German
-de_text = "Ein kleiner Hund namens Max lebte in einem ruhigen Dorf. Jeden Tag rannte er durch die Straßen und spielte mit den Kindern. Eines Tages fand er einen geheimen Garten, den niemand kannte. Max entschied sich, den Garten zu erkunden und entdeckte viele schöne Blumen und Tiere. Von diesem Tag an besuchte er den Garten jeden Nachmittag."
+text = """Vieles Seltsame geschieht auf Erden :
+Nichts Seltsameres sieht der Mond
+Als das Glück, das im Knopfloch wohnt.
+Zaubrisch faßt es den ernsten Mann.
+Ohne nach Weib u. Kind zu fragen
+Reitet er aus, nach dem Glück zu jagen,
+Nur nacb ihm war stets sein Vegehr.
+Aber neben ihm reitet der Dämon her
+Des Ehrgeizes mit finsterer Tücke,
+Und so jagt er zuletzt auf die Brücke,
+Die über dem Abgrund, d:m nächtlich schwarzen
+Jählings abbricht."""
      
 
 # Detect language
-result = lang_pipeline(de_text)
+result = lang_pipeline(text)
 print(result)
 ```
 **Expected Output:**
 ```
 {'language': 'de', 'score': 1.0}
 ```
-Score represents the probability of the detected language based on the input text.
+The score represents the model’s confidence (as a probability) in the detected language.
 
 
-For a more details about the usage and the possibilities that this pipeline provides, please check out our demo [notebook](https://github.com/impresso/impresso-datalab-notebooks/blob/main/annotate/langident_pipeline_demo.ipynb). 
+For more details about usage and available features, see the demo [notebook](https://github.com/impresso/impresso-datalab-notebooks/blob/main/annotate/langident_pipeline_demo.ipynb).
