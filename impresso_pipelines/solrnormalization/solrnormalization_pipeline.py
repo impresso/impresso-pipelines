@@ -13,7 +13,7 @@ from .lang_configs import LANG_CONFIGS
 class SolrNormalizationPipeline:
     """
     Pipeline for text normalization using Apache Lucene analyzers.
-    Handles language detection, tokenization, and normalization for supported languages ('de', 'fr', 'el', 'ru').
+    Handles language detection, tokenization, and normalization for 7 supported languages
     """
 
     LUCENE_VERSION = "9.3.0"

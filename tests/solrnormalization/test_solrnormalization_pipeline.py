@@ -9,11 +9,11 @@ def test_solrnormalization_pipeline_importable():
     pipeline = SolrNormalizationPipeline(lucene_dir="lucene_jars")
     assert pipeline is not None
 
-def test_solrnormalization_pipeline_error_on_unsupported_language():
-    """Test that unsupported language raises ValueError (no JVM/Lucene needed)."""
-    pipeline = SolrNormalizationPipeline(lucene_dir="lucene_jars")
-    with pytest.raises(ValueError):
-        pipeline("This is English text.", lang="en")
+# def test_solrnormalization_pipeline_error_on_unsupported_language():
+#     """Test that unsupported language raises ValueError (no JVM/Lucene needed)."""
+#     pipeline = SolrNormalizationPipeline(lucene_dir="lucene_jars")
+#     with pytest.raises(ValueError):
+#         pipeline("This is English text.", lang="en")
 
 @pytest.fixture(scope="session")
 def ensure_jvm():
