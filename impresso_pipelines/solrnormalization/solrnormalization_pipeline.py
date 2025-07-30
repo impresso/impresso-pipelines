@@ -13,16 +13,17 @@ from .lang_configs import LANG_CONFIGS
 class SolrNormalizationPipeline:
     """
     Pipeline for text normalization using Apache Lucene analyzers.
-    Handles language detection, tokenization, and normalization for supported languages ('de', 'fr', 'el', 'ru').
+    Handles language detection, tokenization, and normalization for 7 supported languages
     """
 
     LUCENE_VERSION = "9.3.0"
 
-    def __init__(self):
+    def __init__(self, lucene_dir: Optional[str] = None):
         """
         Initialize the pipeline, setting up temporary directories, downloading dependencies, and preparing stopwords.
         Supports all languages defined in LANG_CONFIGS.
         """
+        self._external_lucene_dir = lucene_dir
         # Create temporary directory
         self.temp_dir = tempfile.mkdtemp(prefix="solrnorm_")
         self.lib_dir = os.path.join(self.temp_dir, "lib")
@@ -34,9 +35,9 @@ class SolrNormalizationPipeline:
             "lucene-core": f"https://repo1.maven.org/maven2/org/apache/lucene/lucene-core/{self.LUCENE_VERSION}/lucene-core-{self.LUCENE_VERSION}.jar",
             "lucene-analysis-common": f"https://repo1.maven.org/maven2/org/apache/lucene/lucene-analysis-common/{self.LUCENE_VERSION}/lucene-analysis-common-{self.LUCENE_VERSION}.jar"
         }
-        
         self._setup_environment()
-        self._download_dependencies()
+        if not self._external_lucene_dir:
+            self._download_dependencies()
         self._create_stopwords()
         self._analyzers = {}
         self._lang_detector = None
@@ -138,13 +139,35 @@ class SolrNormalizationPipeline:
         """
         Start the JVM with the required classpath for Lucene libraries.
         """
+        # Allow skipping JVM startup for test environments
+        import os
+        if os.environ.get("IMPRESSO_SKIP_JVM", "0") == "1":
+            # For test environments: skip JVM startup and Lucene class check
+            return
+
         if not jpype.isJVMStarted():
-            jar_paths = [os.path.join(self.lib_dir, os.path.basename(url)) 
-                        for url in self.jar_urls.values()]
-            print("📦 Starting JVM with classpath:")
-            for j in jar_paths:
-                print(" -", j)
+            if self._external_lucene_dir:
+                import glob
+                jar_paths = glob.glob(os.path.join(self._external_lucene_dir, "*.jar"))
+                print("📦 Starting JVM with external lucene_dir classpath:")
+                for j in jar_paths:
+                    print(" -", j)
+            else:
+                jar_paths = [os.path.join(self.lib_dir, os.path.basename(url)) 
+                             for url in self.jar_urls.values()]
+                print("📦 Starting JVM with downloaded classpath:")
+                for j in jar_paths:
+                    print(" -", j)
             jpype.startJVM(classpath=jar_paths)
+        else:
+            # JVM already started, check if Lucene classes are available
+            try:
+                from org.apache.lucene.analysis.standard import StandardAnalyzer
+                from org.apache.lucene.analysis.custom import CustomAnalyzer
+            except ImportError as e:
+                print("[ERROR] JVM is already started but Lucene classes are not available in the classpath.")
+                print("[ERROR] This usually happens if another library started the JVM without Lucene jars.")
+                raise RuntimeError("JVM started without Lucene jars. Please ensure no other code starts the JVM before SolrNormalizationPipeline.") from e
 
     def _build_analyzer(self, lang: str):
         """
