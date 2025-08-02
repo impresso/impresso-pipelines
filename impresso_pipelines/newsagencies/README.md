@@ -12,14 +12,13 @@ A simple Named Entity Recognition (NER) pipeline for processing long texts in ma
 
 ## NERLong usage example
 
-
 ```python
 from impresso_pipelines.nerlong import NERLongPipeline
 
 # Initialize the pipeline
 ner = NERLongPipeline()
 
-# Run on your text
+# Run on a single text
 text = "Your long document text goes here…"
 entities, summary = ner(
     input_text=text,
@@ -32,3 +31,8 @@ for ent in entities:
 
 print("\nSummary (max confidence per entity type):")
 print(summary)
+
+# Or run on a batch of texts
+texts = ["First document...", "Second document..."]
+batch_results = ner(texts)
+```
