@@ -256,8 +256,8 @@ class SolrNormalizationPipeline:
         
         if confidence < 0.5:
             detected_lang = "general"
-            raise Warning(f"Low confidence ({confidence}) in detected language '{detected_lang}'. Switching to general case. Otherwise, consider providing a specific language code.")
-        
+            print(f"[WARNING] Low confidence ({confidence}) in detected language '{detected_lang}'. Switching to general case. Otherwise, consider providing a specific language code.")
+
         return detected_lang
     
 
