@@ -11,7 +11,7 @@ packages = [
 
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.12"
 cython = "*"
 numpy = "1.26.4"
 huggingface_hub = { version = "*", optional = true }
