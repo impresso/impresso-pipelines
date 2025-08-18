@@ -255,7 +255,9 @@ class SolrNormalizationPipeline:
             raise ValueError(f"Detected language '{detected_lang}' is not supported. Supported: {list(LANG_CONFIGS.keys())}")
         
         if confidence < 0.5:
-            raise ValueError(f"Low confidence in language detection: {detected_lang} (confidence: {confidence}). Please check the input text or specify a language explicitly.")
+            detected_lang = "general"
+            raise Warning(f"Low confidence ({confidence}) in detected language '{detected_lang}'. Switching to general case. Otherwise, consider providing a specific language code.")
+        
         return detected_lang
     
 
