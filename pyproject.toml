@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "impresso-pipelines"
-version = "0.4.6.8"
+version = "0.4.6.9"
 description = "A custom package containing multiple pipelines simplifying reproducibility of impresso steps"
 authors = ["Glebs Vinarskis <gleb.vinarskis@gmail.com>"]
 readme = "README.md"
@@ -11,7 +11,7 @@ packages = [
 
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = "^3.11"
 cython = "*"
 numpy = "1.26.4"
 huggingface_hub = { version = "*", optional = true }
