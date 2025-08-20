@@ -9,7 +9,18 @@ from impresso_pipelines.ocrqa import OCRQAPipeline()
 ocrqa_pipeline = OCRQAPipeline()
 
 # Example text extracted from OCR
-de_text = "Ein kleiner Hund namens Max lebte in einem ruhigen Dorf. Jeden Tag rannte er durch die Straßen und spielte mit den Kindern. Eines Tages fand er einen geheimen Garten, den niemand kannte. Max entschied sich, den Garten zu erkunden und entdeckte viele schöne Blumen und Tiere. Von diesem Tag an besuchte er den Garten jeden Nachmittag."
+de_text = """Vieles Seltsame geschieht auf Erden :
+Nichts Seltsameres sieht der Mond
+Als das Glück, das im Knopfloch wohnt.
+Zaubrisch faßt es den ernsten Mann.
+Ohne nach Weib u. Kind zu fragen
+Reitet er aus, nach dem Glück zu jagen,
+Nur nacb ihm war stets sein Vegehr.
+Aber neben ihm reitet der Dämon her
+Des Ehrgeizes mit finsterer Tücke,
+Und so jagt er zuletzt auf die Brücke,
+Die über dem Abgrund, d:m nächtlich schwarzen
+Jählings abbricht."""
      
 
 # Get an answer
