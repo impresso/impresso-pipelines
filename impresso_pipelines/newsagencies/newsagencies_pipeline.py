@@ -19,10 +19,6 @@ from transformers.modeling_outputs import TokenClassifierOutput
 
 from impresso_pipelines.newsagencies.config import AGENCY_LINKS
 
-print("=" * 80)
-print("UPDATED NEWSAGENCIES PIPELINE MODULE LOADED - VERSION 2.0")
-print("=" * 80)
-
 log_level = os.environ.get("LOGLEVEL", "WARNING").upper()  # Set logging level
 logging.basicConfig(level=getattr(logging, log_level, logging.DEBUG), force=True)
 logger = logging.getLogger(__name__)
@@ -131,29 +127,15 @@ class ChunkAwareTokenClassification(Pipeline):
         min_score (float): Minimum confidence score for filtering entities.
     """
 
-    def __init__(self, model=None, tokenizer=None, min_score: float = 0.50, **kwargs):
+    def __init__(self, *args: Any, min_score: float = 0.50, **kwargs: Any):
         """
         Initialize the pipeline.
 
         Args:
-            model: The model to use for token classification.
-            tokenizer: The tokenizer to use.
             min_score (float): Minimum confidence score for filtering entities.
-            **kwargs: Additional keyword arguments for Pipeline.
         """
-        print(f"DEBUG ChunkAwareTokenClassification.__init__ called with:")
-        print(f"  model type: {type(model)}")
-        print(f"  tokenizer type: {type(tokenizer)}")
-        print(f"  min_score: {min_score}")
-        print(f"  kwargs: {kwargs}")
-        
-        # Ensure task is set for Pipeline
-        kwargs.setdefault('task', 'token-classification')
-        
-        # Initialize parent Pipeline with explicit arguments
-        super().__init__(model=model, tokenizer=tokenizer, **kwargs)
+        super().__init__(*args, **kwargs)
         self.min_score = min_score
-        print("DEBUG ChunkAwareTokenClassification.__init__ completed successfully")
 
     def _sanitize_parameters(
         self, **kwargs: Any
@@ -379,10 +361,12 @@ class NewsAgenciesPipeline:
                  min_relevance: float = 0.1, batch_size: int = 1):
         """
         Initialize the pipeline with pre-loaded models and components.
-        """
-        print("NEWSAGENCIES PIPELINE INIT CALLED - UPDATED VERSION!")
-        print(f"Model ID: {model_id}")
         
+        Args:
+            model_id (str): Model identifier.
+            min_relevance (float): Default minimum confidence score for filtering entities.
+            batch_size (int): Default batch size for processing.
+        """
         self.model_id = model_id
         self.default_min_relevance = min_relevance
         self.default_batch_size = batch_size
@@ -407,7 +391,6 @@ class NewsAgenciesPipeline:
         self.ner = ChunkAwareTokenClassification(
             model=self.model,
             tokenizer=self.tokenizer,
-            task="token-classification",
             min_score=min_relevance,
             device=device,
             batch_size=batch_size,
