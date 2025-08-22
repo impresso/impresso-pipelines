@@ -31,7 +31,7 @@ class NewsAgencyTokenClassifier(PreTrainedModel):
     Attributes:
         config_class (type): Configuration class for the model.
         num_labels (int): Number of classification labels.
-        bert (nn.Module): Backbone encoder model.
+        bert (nn.Module): Backbone encoder model./
         dropout (nn.Dropout): Dropout layer for regularization.
         token_classifier (nn.Linear): Linear layer for token classification.
     """
@@ -151,18 +151,20 @@ class ChunkAwareTokenClassification(Pipeline):
         """
         return kwargs, {}, {}
 
-    def preprocess(self, text: str, **kwargs: Any) -> Dict[str, Any]:
+    def preprocess(self, texts: Any, **kwargs: Any) -> Dict[str, Any]:
         """
-        Tokenize and prepare input text for the model.
+        Tokenize and prepare input text(s) for the model.
 
         Args:
-            text (str): Input text.
+            texts (str or List[str]): Input text(s).
 
         Returns:
             Dict[str, Any]: Tokenized input for the model.
         """
+        if isinstance(texts, str):
+            texts = [texts]
         return self.tokenizer(
-            text,
+            texts,
             return_tensors="pt",
             truncation=True,
             padding="max_length",
@@ -196,7 +198,7 @@ class ChunkAwareTokenClassification(Pipeline):
         self,
         model_and_inputs: Tuple[TokenClassifierOutput, Dict[str, torch.Tensor]],
         **kwargs: Any,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[List[Dict[str, Any]]]:
         """
         Extract entities from model outputs.
 
@@ -204,66 +206,91 @@ class ChunkAwareTokenClassification(Pipeline):
             model_and_inputs (Tuple[TokenClassifierOutput, Dict[str, torch.Tensor]]): Model outputs and inputs.
 
         Returns:
-            List[Dict[str, Any]]: Extracted entities.
+            List[List[Dict[str, Any]]]: List of extracted entities for each input text.
         """
         model_outputs, tokenised = model_and_inputs
         id2label = self.model.config.id2label
         batch_logits = model_outputs.logits
 
-        results: List[Dict[str, Any]] = []
-        seen: Set[Tuple[int, int, str]] = set()
-
-        for i in range(batch_logits.size(0)):
-            logits = batch_logits[i]
-            offsets = tokenised["offset_mapping"][i]
-            att_mask = tokenised["attention_mask"][i]
-            tokens = self.tokenizer.convert_ids_to_tokens(tokenised["input_ids"][i])
-
-            current_word, current_logits, current_offsets = [], None, []
-
-            for tok, mask, offs, logit in zip(tokens, att_mask, offsets, logits):
-                if mask.item() == 0 or tok in {"[CLS]", "[SEP]", "[PAD]"}:
-                    continue
-
-                if logger.isEnabledFor(logging.DEBUG):
-                    probs = F.softmax(logit, dim=-1)
-                    sorted_idx = torch.argsort(probs, descending=True)
-                    prob_str = ", ".join(
-                        f"'{id2label[int(i)]}':{probs[i]:.3f}"
-                        for i in sorted_idx
-                        if probs[i] > 0.001
-                    )
+        # If batch is flattened due to overflow, group by 'overflow_to_sample_mapping'
+        mapping = tokenised.get("overflow_to_sample_mapping", None)
+        if mapping is not None:
+            # Group results by sample index
+            grouped_results = [[] for _ in range(max(mapping.tolist()) + 1)]
+            seen_list = [set() for _ in grouped_results]
+            for i in range(batch_logits.size(0)):
+                logits = batch_logits[i]
+                offsets = tokenised["offset_mapping"][i]
+                att_mask = tokenised["attention_mask"][i]
+                tokens = self.tokenizer.convert_ids_to_tokens(tokenised["input_ids"][i])
+                sample_idx = mapping[i].item()
+                current_word, current_logits, current_offsets = [], None, []
+                for tok, mask, offs, logit in zip(tokens, att_mask, offsets, logits):
+                    if mask.item() == 0 or tok in {"[CLS]", "[SEP]", "[PAD]"}:
+                        continue
                     start, stop = offs.tolist()
-                    logger.debug(f"Sub-token '{tok}' @({start},{stop}) → {prob_str}")
-
-                start, stop = offs.tolist()
-
-                if not tok.startswith("##"):
-                    if current_word and current_logits is not None:
-                        ent = self._finalise_word(
-                            current_word,
-                            current_logits,
-                            current_offsets,
-                            id2label,
-                            seen,
-                        )
-                        if ent:
-                            results.append(ent)
-                    current_word = [tok]
-                    current_logits = logit
-                    current_offsets = [(start, stop)]
-                else:
-                    current_word.append(tok)
-                    current_offsets.append((start, stop))
-
-            if current_word:
-                ent = self._finalise_word(
-                    current_word, current_logits, current_offsets, id2label, seen
-                )
-                if ent:
-                    results.append(ent)
-
-        return results
+                    if not tok.startswith("##"):
+                        if current_word and current_logits is not None:
+                            ent = self._finalise_word(
+                                current_word,
+                                current_logits,
+                                current_offsets,
+                                id2label,
+                                seen_list[sample_idx],
+                            )
+                            if ent:
+                                grouped_results[sample_idx].append(ent)
+                        current_word = [tok]
+                        current_logits = logit
+                        current_offsets = [(start, stop)]
+                    else:
+                        current_word.append(tok)
+                        current_offsets.append((start, stop))
+                if current_word:
+                    ent = self._finalise_word(
+                        current_word, current_logits, current_offsets, id2label, seen_list[sample_idx]
+                    )
+                    if ent:
+                        grouped_results[sample_idx].append(ent)
+            return grouped_results
+        else:
+            # Single input fallback
+            results: List[Dict[str, Any]] = []
+            seen: Set[Tuple[int, int, str]] = set()
+            for i in range(batch_logits.size(0)):
+                logits = batch_logits[i]
+                offsets = tokenised["offset_mapping"][i]
+                att_mask = tokenised["attention_mask"][i]
+                tokens = self.tokenizer.convert_ids_to_tokens(tokenised["input_ids"][i])
+                current_word, current_logits, current_offsets = [], None, []
+                for tok, mask, offs, logit in zip(tokens, att_mask, offsets, logits):
+                    if mask.item() == 0 or tok in {"[CLS]", "[SEP]", "[PAD]"}:
+                        continue
+                    start, stop = offs.tolist()
+                    if not tok.startswith("##"):
+                        if current_word and current_logits is not None:
+                            ent = self._finalise_word(
+                                current_word,
+                                current_logits,
+                                current_offsets,
+                                id2label,
+                                seen,
+                            )
+                            if ent:
+                                results.append(ent)
+                        current_word = [tok]
+                        current_logits = logit
+                        current_offsets = [(start, stop)]
+                    else:
+                        current_word.append(tok)
+                        current_offsets.append((start, stop))
+                if current_word:
+                    ent = self._finalise_word(
+                        current_word, current_logits, current_offsets, id2label, seen
+                    )
+                    if ent:
+                        results.append(ent)
+            return [results]
 
     def _finalise_word(
         self,
@@ -331,16 +358,18 @@ class NewsAgenciesPipeline:
     """
 
     def __init__(self, model_id: str = "impresso-project/ner-newsagency-bert-multilingual", 
-                 min_relevance: float = 0.1):
+                 min_relevance: float = 0.1, batch_size: int = 1):
         """
         Initialize the pipeline with pre-loaded models and components.
         
         Args:
             model_id (str): Model identifier.
             min_relevance (float): Default minimum confidence score for filtering entities.
+            batch_size (int): Default batch size for processing.
         """
         self.model_id = model_id
         self.default_min_relevance = min_relevance
+        self.default_batch_size = batch_size
         
         # Load model configuration and components once
         config = AutoConfig.from_pretrained(model_id)
@@ -364,125 +393,125 @@ class NewsAgenciesPipeline:
             tokenizer=self.tokenizer,
             min_score=min_relevance,
             device=device,
+            batch_size=batch_size,
         )
 
-    def __call__(self, input_text: str, min_relevance: Optional[float] = None, 
+    def __call__(self, input_texts: Any, min_relevance: Optional[float] = None, 
                  diagnostics: bool = False, suppress_entities: Optional[Sequence[str]] = [], 
-                 batch_size: Optional[int] = 1) -> Dict[str, Any]:
+                 batch_size: Optional[int] = None) -> Any:
         """
-        Run the pipeline to extract entities from text.
+        Run the pipeline to extract entities from text(s).
 
         Args:
-            input_text (str): Input text for processing.
+            input_texts (str or List[str]): Input text(s) for processing.
             min_relevance (Optional[float]): Minimum confidence score for filtering entities. 
                                            If None, uses the default set during initialization.
             diagnostics (bool): Whether to include diagnostics in the output.
             suppress_entities (Optional[Sequence[str]]): Entities to suppress.
-            batch_size (Optional[int]): Batch size for processing.
+            batch_size (Optional[int]): Batch size for processing. If None, uses the default.
 
         Returns:
-            Dict[str, Any]: Extracted entities and summary.
+            List[Dict[str, Any]] or Dict[str, Any]: Extracted entities and summary for each input.
         """
-        # Ensure model is in evaluation mode (safety measure)
         self.model.eval()
-        
-        # Use provided min_relevance or fall back to default
         if min_relevance is not None and min_relevance != self.ner.min_score:
-            # Update the pipeline's min_score if different from current
             self.ner.min_score = min_relevance
-        
+
+        # Use provided batch_size or fall back to default
+        current_batch_size = batch_size if batch_size is not None else self.default_batch_size
+
         suppress_entities = suppress_entities + ['org.ent.pressagency.unk', 'ag', 'pers.ind.articleauthor']
 
-        # Pass batch_size to the pipeline if provided
-        entities = self.ner(input_text, batch_size=batch_size) 
+        # Accept single string or list of strings
+        if isinstance(input_texts, str):
+            input_texts = [input_texts]
+        entities_batch = self.ner(input_texts, batch_size=current_batch_size)
 
         SUPPRESS = frozenset(suppress_entities)
+        results = []
 
-        merged: List[Dict[str, Any]] = []
-        current: Optional[Dict[str, Any]] = None
+        for input_text, entities in zip(input_texts, entities_batch):
+            if isinstance(entities, list) and all(isinstance(e, list) for e in entities):
+                # Flatten nested lists if entities are grouped
+                entities = [item for sublist in entities for item in sublist]
 
-        for tok in entities:
-            iob, base = tok["entity"].split("-", 1)
+            merged: List[Dict[str, Any]] = []
+            current: Optional[Dict[str, Any]] = None
 
-            if base in SUPPRESS:
-                continue
-
-            if iob == "B":
-                if current:
-                    merged.append(current)
-                start = tok["start"]
-                stop = tok["stop"]
-                current = {
-                    # preserve exact original spacing by slicing the raw text
-                    "surface": input_text[start:stop],
-                    "entity": base,
-                    "start": start,
-                    "stop": stop,  # Updated key name
-                    "relevance": round(tok["score"], 3),
-                }
-
-            elif iob == "I":
-                if current and current["entity"] == base:
-                    start = current["start"]
-                    stop = tok["stop"]
-                    current["surface"] = input_text[start:stop]
-                    current["stop"] = stop  # Updated key name
-                    current["relevance"] = max(current["relevance"], tok["score"])
-                    current["relevance"] = round(current["relevance"], 3)
-                else:
+            for tok in entities:
+                if not isinstance(tok, dict):
+                    logger.error(f"Invalid token format: {tok}")
                     continue
-            
+                entity = tok.get("entity", "")
+                if not isinstance(entity, str):
+                    logger.error(f"Invalid entity format: {entity}")
+                    continue
+                iob, base = entity.split("-", 1)
+                if base in SUPPRESS:
+                    continue
+                if iob == "B":
+                    if current:
+                        merged.append(current)
+                    start = tok["start"]
+                    stop = tok["stop"]
+                    current = {
+                        "surface": input_text[start:stop],
+                        "entity": base,
+                        "start": start,
+                        "stop": stop,
+                        "relevance": round(tok["score"], 3),
+                    }
+                elif iob == "I":
+                    if current and current["entity"] == base:
+                        start = current["start"]
+                        stop = tok["stop"]
+                        current["surface"] = input_text[start:stop]
+                        current["stop"] = stop
+                        current["relevance"] = max(current["relevance"], tok["score"])
+                        current["relevance"] = round(current["relevance"], 3)
+                    else:
+                        continue
+            if current:
+                merged.append(current)
 
-        if current:
-            merged.append(current)
-
-        summary = {}
-        for ent in merged:
-            summary[ent["entity"]] = max(
-                summary.get(ent["entity"], 0.0), round(ent["relevance"], 3)
-            )
-    
-        # trasnform summary into a list of dictionaries
-        sorted_items = sorted(summary.items(), key=lambda item: item[1], reverse=True)
-        summary = [
-            {"uid": uid, "relevance": relevance}
-            for uid, relevance in sorted_items
-        ]
-
-        # sort merged by relevance
-        merged.sort(key=lambda x: x["relevance"], reverse=True)
-
-
-        # add to merged to each agency another key "wikidata_link" with the link to the agency (stripe from entity from front org.ent.pressagency)
-        for agency in merged:
-            agency["wikidata_link"] = AGENCY_LINKS.get(agency['entity'].replace("org.ent.pressagency.", ""), None)
-
-        # # add to merged to each agency another key "wikidata_link" with the link to the agency
-        for agency in summary:
-            agency["wikidata_link"] = AGENCY_LINKS.get(agency['uid'].replace("org.ent.pressagency.", ""), None)
-
-        merged = {
-            "agencies": merged,
-            "text": input_text,
-        }
-
-        summary = {
-            "agencies": summary,
-        }
-
-        if diagnostics:
-            if 'agencies' in merged and isinstance(merged['agencies'], list):
-                new_agencies = []
-                for item in merged['agencies']:
-                    new_item = {}
-                    for key in item:
-                        if key == 'entity':
-                            new_item['uid'] = item[key]
-                        else:
-                            new_item[key] = item[key]
-                    new_agencies.append(new_item)
-                merged['agencies'] = new_agencies
-                
-            return merged
-        else:
-            return summary
+            summary = {}
+            for ent in merged:
+                summary[ent["entity"]] = max(
+                    summary.get(ent["entity"], 0.0), round(ent["relevance"], 3)
+                )
+            sorted_items = sorted(summary.items(), key=lambda item: item[1], reverse=True)
+            summary = [
+                {"uid": uid, "relevance": relevance}
+                for uid, relevance in sorted_items
+            ]
+            merged.sort(key=lambda x: x["relevance"], reverse=True)
+            for agency in merged:
+                agency["wikidata_link"] = AGENCY_LINKS.get(agency['entity'].replace("org.ent.pressagency.", ""), None)
+            for agency in summary:
+                agency["wikidata_link"] = AGENCY_LINKS.get(agency['uid'].replace("org.ent.pressagency.", ""), None)
+            merged_dict = {
+                "agencies": merged,
+                "text": input_text,
+            }
+            summary_dict = {
+                "agencies": summary,
+            }
+            if diagnostics:
+                if 'agencies' in merged_dict and isinstance(merged_dict['agencies'], list):
+                    new_agencies = []
+                    for item in merged_dict['agencies']:
+                        new_item = {}
+                        for key in item:
+                            if key == 'entity':
+                                new_item['uid'] = item[key]
+                            else:
+                                new_item[key] = item[key]
+                        new_agencies.append(new_item)
+                    merged_dict['agencies'] = new_agencies
+                results.append(merged_dict)
+            else:
+                results.append(summary_dict)
+        # Return single result if input was a string, else list
+        if len(results) == 1:
+            return results[0]
+        return results
