@@ -358,16 +358,18 @@ class NewsAgenciesPipeline:
     """
 
     def __init__(self, model_id: str = "impresso-project/ner-newsagency-bert-multilingual", 
-                 min_relevance: float = 0.1):
+                 min_relevance: float = 0.1, batch_size: int = 1):
         """
         Initialize the pipeline with pre-loaded models and components.
         
         Args:
             model_id (str): Model identifier.
             min_relevance (float): Default minimum confidence score for filtering entities.
+            batch_size (int): Default batch size for processing.
         """
         self.model_id = model_id
         self.default_min_relevance = min_relevance
+        self.default_batch_size = batch_size
         
         # Load model configuration and components once
         config = AutoConfig.from_pretrained(model_id)
@@ -391,10 +393,12 @@ class NewsAgenciesPipeline:
             tokenizer=self.tokenizer,
             min_score=min_relevance,
             device=device,
+            batch_size=batch_size,
         )
 
     def __call__(self, input_texts: Any, min_relevance: Optional[float] = None, 
-                 diagnostics: bool = False, suppress_entities: Optional[Sequence[str]] = []) -> Any:
+                 diagnostics: bool = False, suppress_entities: Optional[Sequence[str]] = [], 
+                 batch_size: Optional[int] = None) -> Any:
         """
         Run the pipeline to extract entities from text(s).
 
@@ -404,6 +408,7 @@ class NewsAgenciesPipeline:
                                            If None, uses the default set during initialization.
             diagnostics (bool): Whether to include diagnostics in the output.
             suppress_entities (Optional[Sequence[str]]): Entities to suppress.
+            batch_size (Optional[int]): Batch size for processing. If None, uses the default.
 
         Returns:
             List[Dict[str, Any]] or Dict[str, Any]: Extracted entities and summary for each input.
@@ -412,12 +417,15 @@ class NewsAgenciesPipeline:
         if min_relevance is not None and min_relevance != self.ner.min_score:
             self.ner.min_score = min_relevance
 
+        # Use provided batch_size or fall back to default
+        current_batch_size = batch_size if batch_size is not None else self.default_batch_size
+
         suppress_entities = suppress_entities + ['org.ent.pressagency.unk', 'ag', 'pers.ind.articleauthor']
 
         # Accept single string or list of strings
         if isinstance(input_texts, str):
             input_texts = [input_texts]
-        entities_batch = self.ner(input_texts)
+        entities_batch = self.ner(input_texts, batch_size=current_batch_size)
 
         SUPPRESS = frozenset(suppress_entities)
         results = []
