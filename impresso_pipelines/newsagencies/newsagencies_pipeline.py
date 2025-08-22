@@ -368,7 +368,7 @@ class NewsAgenciesPipeline:
 
     def __call__(self, input_text: str, min_relevance: Optional[float] = None, 
                  diagnostics: bool = False, suppress_entities: Optional[Sequence[str]] = [], 
-                 batch_size: Optional[int] = None) -> Dict[str, Any]:
+                 batch_size: Optional[int] = 1) -> Dict[str, Any]:
         """
         Run the pipeline to extract entities from text.
 
