@@ -391,6 +391,7 @@ class NewsAgenciesPipeline:
         self.ner = ChunkAwareTokenClassification(
             model=self.model,
             tokenizer=self.tokenizer,
+            task="token-classification",
             min_score=min_relevance,
             device=device,
             batch_size=batch_size,
