@@ -367,7 +367,8 @@ class NewsAgenciesPipeline:
         )
 
     def __call__(self, input_text: str, min_relevance: Optional[float] = None, 
-                 diagnostics: bool = False, suppress_entities: Optional[Sequence[str]] = []) -> Dict[str, Any]:
+                 diagnostics: bool = False, suppress_entities: Optional[Sequence[str]] = [], 
+                 batch_size: Optional[int] = 1) -> Dict[str, Any]:
         """
         Run the pipeline to extract entities from text.
 
@@ -377,6 +378,7 @@ class NewsAgenciesPipeline:
                                            If None, uses the default set during initialization.
             diagnostics (bool): Whether to include diagnostics in the output.
             suppress_entities (Optional[Sequence[str]]): Entities to suppress.
+            batch_size (Optional[int]): Batch size for processing.
 
         Returns:
             Dict[str, Any]: Extracted entities and summary.
@@ -391,7 +393,8 @@ class NewsAgenciesPipeline:
         
         suppress_entities = suppress_entities + ['org.ent.pressagency.unk', 'ag', 'pers.ind.articleauthor']
 
-        entities = self.ner(input_text)
+        # Pass batch_size to the pipeline if provided
+        entities = self.ner(input_text, batch_size=batch_size) 
 
         SUPPRESS = frozenset(suppress_entities)
 
