@@ -431,10 +431,17 @@ class NewsAgenciesPipeline:
         results = []
 
         for input_text, entities in zip(input_texts, entities_batch):
+            if isinstance(entities, list) and all(isinstance(e, list) for e in entities):
+                # Flatten nested lists if entities are grouped
+                entities = [item for sublist in entities for item in sublist]
+
             merged: List[Dict[str, Any]] = []
             current: Optional[Dict[str, Any]] = None
 
             for tok in entities:
+                if not isinstance(tok, dict):
+                    logger.error(f"Invalid token format: {tok}")
+                    continue
                 entity = tok.get("entity", "")
                 if not isinstance(entity, str):
                     logger.error(f"Invalid entity format: {entity}")
