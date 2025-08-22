@@ -61,8 +61,19 @@ from impresso_pipelines.ldatopics import LDATopicsPipeline
 # Initialize the pipeline
 ldatopics_pipeline = LDATopicsPipeline()
 
-# Example text extracted from OCR
-de_text = "Ein kleiner Hund namens Max lebte in einem ruhigen Dorf. Jeden Tag rannte er durch die Straßen und spielte mit den Kindern. Eines Tages fand er einen geheimen Garten, den niemand kannte. Max entschied sich, den Garten zu erkunden und entdeckte viele schöne Blumen und Tiere. Von diesem Tag an besuchte er den Garten jeden Nachmittag."
+# Example text in German
+de_text = """Vieles Seltsame geschieht auf Erden :
+Nichts Seltsameres sieht der Mond
+Als das Glück, das im Knopfloch wohnt.
+Zaubrisch faßt es den ernsten Mann.
+Ohne nach Weib u. Kind zu fragen
+Reitet er aus, nach dem Glück zu jagen,
+Nur nacb ihm war stets sein Vegehr.
+Aber neben ihm reitet der Dämon her
+Des Ehrgeizes mit finsterer Tücke,
+Und so jagt er zuletzt auf die Brücke,
+Die über dem Abgrund, d:m nächtlich schwarzen
+Jählings abbricht."""
      
 
 # Get an answer
@@ -71,22 +82,18 @@ print(result)
 ```
 **Expected Output:**
 ```
-[{'uid': 'doc3',
-  'ts': '2025-05-10T10:42:12Z',
-  'language': 'de',
-  'topic_count': 100,
-  'topics': [{'t': 'tm-de-all-v2.0_tp87_de', 'p': 0.202},
-   {'t': 'tm-de-all-v2.0_tp33_de', 'p': 0.108},
-   {'t': 'tm-de-all-v2.0_tp30_de', 'p': 0.097},
-   {'t': 'tm-de-all-v2.0_tp65_de', 'p': 0.064},
-   {'t': 'tm-de-all-v2.0_tp59_de', 'p': 0.052},
-   {'t': 'tm-de-all-v2.0_tp80_de', 'p': 0.052},
-   {'t': 'tm-de-all-v2.0_tp02_de', 'p': 0.03},
-   {'t': 'tm-de-all-v2.0_tp31_de', 'p': 0.03},
-   {'t': 'tm-de-all-v2.0_tp66_de', 'p': 0.03}],
-  'relevance': 0.02,
-  'topic_model_id': 'tm-de-all-v2.0',
-  'topic_model_description': 'https://huggingface.co/impresso-project/mallet-topic-inferencer/resolve/main/models/tm/tm-de-all-v2.0.topic_model_topic_description.jsonl.bz2'}]
+{'uid': 'doc0',
+ 'ts': '2025-08-20T14:31:44Z',
+ 'language': 'de',
+ 'topic_count': 100,
+ 'topics': 
+      [
+        {'uid': 'tm-de-all-v2.0_tp30_de', 'relevance': 0.652},
+        {'uid': 'tm-de-all-v2.0_tp65_de', 'relevance': 0.041}
+      ],
+ 'min_relevance': 0.02,
+ 'topic_model_id': 'tm-de-all-v2.0',
+ 'topic_model_description': 'https://huggingface.co/impresso-project/mallet-topic-inferencer/resolve/main/models/tm/tm-de-all-v2.0.topic_model_topic_description.jsonl.bz2'}
 ```
 
 For a more details about the usage and the possibilities that this pipeline provides, please check out our demo [notebook](https://github.com/impresso/impresso-datalab-notebooks/blob/main/annotate/ldatopics_pipeline_demo.ipynb).
