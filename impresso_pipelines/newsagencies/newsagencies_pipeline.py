@@ -435,7 +435,11 @@ class NewsAgenciesPipeline:
             current: Optional[Dict[str, Any]] = None
 
             for tok in entities:
-                iob, base = tok["entity"].split("-", 1)
+                entity = tok.get("entity", "")
+                if not isinstance(entity, str):
+                    logger.error(f"Invalid entity format: {entity}")
+                    continue
+                iob, base = entity.split("-", 1)
                 if base in SUPPRESS:
                     continue
                 if iob == "B":
