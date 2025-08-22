@@ -19,6 +19,10 @@ from transformers.modeling_outputs import TokenClassifierOutput
 
 from impresso_pipelines.newsagencies.config import AGENCY_LINKS
 
+print("=" * 80)
+print("UPDATED NEWSAGENCIES PIPELINE MODULE LOADED - VERSION 2.0")
+print("=" * 80)
+
 log_level = os.environ.get("LOGLEVEL", "WARNING").upper()  # Set logging level
 logging.basicConfig(level=getattr(logging, log_level, logging.DEBUG), force=True)
 logger = logging.getLogger(__name__)
@@ -375,12 +379,10 @@ class NewsAgenciesPipeline:
                  min_relevance: float = 0.1, batch_size: int = 1):
         """
         Initialize the pipeline with pre-loaded models and components.
-        
-        Args:
-            model_id (str): Model identifier.
-            min_relevance (float): Default minimum confidence score for filtering entities.
-            batch_size (int): Default batch size for processing.
         """
+        print("NEWSAGENCIES PIPELINE INIT CALLED - UPDATED VERSION!")
+        print(f"Model ID: {model_id}")
+        
         self.model_id = model_id
         self.default_min_relevance = min_relevance
         self.default_batch_size = batch_size
