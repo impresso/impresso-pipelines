@@ -137,12 +137,19 @@ class ChunkAwareTokenClassification(Pipeline):
             min_score (float): Minimum confidence score for filtering entities.
             **kwargs: Additional keyword arguments for Pipeline.
         """
+        print(f"DEBUG ChunkAwareTokenClassification.__init__ called with:")
+        print(f"  model type: {type(model)}")
+        print(f"  tokenizer type: {type(tokenizer)}")
+        print(f"  min_score: {min_score}")
+        print(f"  kwargs: {kwargs}")
+        
         # Ensure task is set for Pipeline
         kwargs.setdefault('task', 'token-classification')
         
         # Initialize parent Pipeline with explicit arguments
         super().__init__(model=model, tokenizer=tokenizer, **kwargs)
         self.min_score = min_score
+        print("DEBUG ChunkAwareTokenClassification.__init__ completed successfully")
 
     def _sanitize_parameters(
         self, **kwargs: Any
