@@ -169,7 +169,7 @@ class ChunkAwareTokenClassification(Pipeline):
             truncation=True,
             padding="max_length",
             max_length=self.tokenizer.model_max_length,
-            stride=50,
+            stride=64,
             return_overflowing_tokens=True,
             return_offsets_mapping=True,
             return_attention_mask=True,
