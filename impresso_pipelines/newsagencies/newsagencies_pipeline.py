@@ -491,7 +491,6 @@ class NewsAgenciesPipeline:
                 agency["wikidata_link"] = AGENCY_LINKS.get(agency['uid'].replace("org.ent.pressagency.", ""), None)
             merged_dict = {
                 "agencies": merged,
-                "text": input_text,
             }
             summary_dict = {
                 "agencies": summary,
