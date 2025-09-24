@@ -215,8 +215,8 @@ class OCRQAPipeline:
 
         if self.diagnostics:
             output["diagnostics"] = {
-                "known_tokens": list(knowns),
-                "unknown_tokens": list(unknowns),
+                "known_tokens": sorted(list(knowns)),
+                "unknown_tokens": sorted(list(unknowns)),
                 "model_id": f"ocrqa-wp_v{self.version}-{self.language}"
             }
         elif self.model_id:
