@@ -11,7 +11,7 @@
 This repository contains a Python package designed for modular and efficient text processing workflows. Currently, it includes the following subpackages:
 
 - **Language Identification Pipeline**: Identifies the language of input text and returns a probability score.
-- **OCR QA Pipeline**: Assesses the quality of OCR text by estimating the proportion of recognized words (0–1), using efficient language-specific Bloom filters.
+- **OCR QA Pipeline**: Assesses the quality of OCR text by estimating the proportion of recognized vocabulary items (0–1), using efficient language-specific Bloom filters.
 - **LDA Topic Modeling Pipeline**: Soft clustering of input texts using LDA-based topic modeling. 
 - **News Agencies Pipeline**: Extracts and ranks news agency entities from text, providing relevance scores and optional links to Wikidata.
 - **Lucene/Solr normalization Pipeline**: Replicates Solr’s language-specific text normalization to clarify how input text is tokenized and indexed in impresso.
