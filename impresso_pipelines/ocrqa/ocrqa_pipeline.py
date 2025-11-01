@@ -54,6 +54,49 @@ class OCRQAPipeline:
         self.lang_model: LangIdentPipeline = LangIdentPipeline()
         self.bloomfilters: Dict[str, BloomFilter] = {}
 
+    def _is_bloomfilter_file(self, filename: str) -> bool:
+        """
+        Check if a filename matches the BloomFilter naming pattern.
+        
+        This method can be overridden in subclasses to support different file naming conventions.
+
+        Args:
+            filename (str): The filename to check.
+
+        Returns:
+            bool: True if the filename matches the BloomFilter pattern.
+        """
+        return filename.startswith("ocrqa-wp_v") and filename.endswith(".bloom")
+
+    def _extract_language_from_filename(self, filename: str) -> str:
+        """
+        Extract the language code from a BloomFilter filename.
+        
+        This method can be overridden in subclasses to support different file naming conventions.
+
+        Args:
+            filename (str): The filename to parse.
+
+        Returns:
+            str: The language code.
+        """
+        return filename.split('-')[-1].split('.')[0]
+
+    def _extract_version_from_filename(self, filename: str) -> Optional[str]:
+        """
+        Extract the version string from a BloomFilter filename.
+        
+        This method can be overridden in subclasses to support different file naming conventions.
+
+        Args:
+            filename (str): The filename to parse.
+
+        Returns:
+            Optional[str]: The version string (e.g., "1.0.5"), or None if not found.
+        """
+        match = re.search(r"_v(\d+\.\d+\.\d+)", filename)
+        return match.group(1) if match else None
+
     def _get_supported_languages(self) -> Set[str]:
         """
         Retrieve the set of supported languages from the repository files.
@@ -62,11 +105,65 @@ class OCRQAPipeline:
             Set[str]: Supported language codes.
         """
         languages: Set[str] = {
-            file.split('-')[-1].split('.')[0] 
+            self._extract_language_from_filename(file)
             for file in self.repo_files 
-            if file.startswith("ocrqa-wp_v")
+            if self._is_bloomfilter_file(file)
         }
         return languages
+
+    def _get_available_versions(self, language: str) -> List[str]:
+        """
+        Get all available BloomFilter versions for a specific language.
+        
+        This method can be overridden in subclasses to support different version retrieval strategies.
+
+        Args:
+            language (str): The language code.
+
+        Returns:
+            List[str]: List of available version strings.
+        """
+        versions: List[str] = []
+        for file in self.repo_files:
+            if self._is_bloomfilter_file(file) and file.endswith(f"-{language}.bloom"):
+                version = self._extract_version_from_filename(file)
+                if version:
+                    versions.append(version)
+        return versions
+
+    def _select_latest_version(self, versions: List[str]) -> str:
+        """
+        Select the latest version from a list of version strings.
+        
+        This method can be overridden in subclasses to implement different version selection logic.
+
+        Args:
+            versions (List[str]): List of version strings (e.g., ["1.0.0", "1.0.5", "2.0.0"]).
+
+        Returns:
+            str: The selected version string.
+        
+        Raises:
+            ValueError: If the versions list is empty.
+        """
+        if not versions:
+            raise ValueError("No versions available")
+        return max(versions, key=lambda v: list(map(int, v.split('.'))))
+
+    def _build_bloomfilter_filename(self, version: str, language: str) -> str:
+        """
+        Build the BloomFilter filename for a given version and language.
+        
+        This method can be overridden in subclasses to support different file naming conventions.
+
+        Args:
+            version (str): The version string.
+            language (str): The language code.
+
+        Returns:
+            str: The BloomFilter filename.
+        """
+        return f"ocrqa-wp_v{version}-{language}.bloom"
 
     def __call__(self, text: str, language: Optional[str] = None, version: Optional[str] = None, 
                  diagnostics: bool = False, model_id: bool = False, supported_languages: bool = False) -> Dict[str, Union[str, float, Dict]]:
@@ -104,14 +201,10 @@ class OCRQAPipeline:
             # Determine version if not provided
             if selected_version is None:
                 try:
-                    versions: List[str] = [
-                        re.search(r"_v(\d+\.\d+\.\d+)", file).group(1)
-                        for file in self.repo_files
-                        if file.startswith("ocrqa-wp_v") and file.endswith(f"-{detected_language}.bloom")
-                    ]
+                    versions: List[str] = self._get_available_versions(detected_language)
                     if not versions:
                         raise ValueError(f"No BloomFilter versions found for language: {detected_language}")
-                    selected_version = max(versions, key=lambda v: list(map(int, v.split('.'))))
+                    selected_version = self._select_latest_version(versions)
                 except Exception as e:
                     raise Exception(f"Failed to retrieve BloomFilter versions: {str(e)}")
 
@@ -119,9 +212,10 @@ class OCRQAPipeline:
             bloomfilter_key: str = f"{detected_language}_{selected_version}"
             if bloomfilter_key not in self.bloomfilters:
                 try:
+                    bloomfilter_filename: str = self._build_bloomfilter_filename(selected_version, detected_language)
                     self.bloomfilters[bloomfilter_key] = get_bloomfilter(
                         self.repo_id, 
-                        f"ocrqa-wp_v{selected_version}-{detected_language}.bloom",
+                        bloomfilter_filename,
                         self.revision
                     )
                 except Exception as e:
