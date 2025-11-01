@@ -7,18 +7,19 @@ import re
 from impresso_pipelines.langident.langident_pipeline import LangIdentPipeline
 
 
-def get_bloomfilter(model_id: str, filename: str) -> BloomFilter:
+def get_bloomfilter(model_id: str, filename: str, revision: str = "main") -> BloomFilter:
     """
     Load a BloomFilter from the Hugging Face Hub.
 
     Args:
         model_id (str): The repository ID.
         filename (str): The file name of the BloomFilter.
+        revision (str): The repository revision (branch, tag, or commit). Defaults to "main".
 
     Returns:
         BloomFilter: The loaded BloomFilter instance.
     """
-    return BloomFilter.open(hf_hub_download(repo_id=model_id, filename=filename))
+    return BloomFilter.open(hf_hub_download(repo_id=model_id, filename=filename, revision=revision))
 
 class OCRQAPipeline:
     """
@@ -26,6 +27,7 @@ class OCRQAPipeline:
 
     Attributes:
         repo_id (str): The Hugging Face repository ID for OCR quality assessment models.
+        revision (str): The repository revision (branch, tag, or commit).
         SUPPORTED_LANGUAGES (set): Set of supported languages.
         lang_model (LangIdentPipeline): Language identification model.
         bloomfilters (dict): Cache for BloomFilter instances.
@@ -33,18 +35,21 @@ class OCRQAPipeline:
     """
     
     DEFAULT_REPO_ID: str = "impresso-project/OCR-quality-assessment-unigram"
+    DEFAULT_REVISION: str = "main"
     
-    def __init__(self, repo_id: Optional[str] = None) -> None:
+    def __init__(self, repo_id: Optional[str] = None, revision: str = "main") -> None:
         """
         Initialize the pipeline by loading supported languages and setting up caches.
         
         Args:
             repo_id (Optional[str]): The Hugging Face repository ID. 
                                     Defaults to "impresso-project/OCR-quality-assessment-unigram".
+            revision (str): The repository revision (branch, tag, or commit). Defaults to "main".
         """
         self.repo_id: str = repo_id or self.DEFAULT_REPO_ID
+        self.revision: str = revision
         
-        self.repo_files: List[str] = list_repo_files(self.repo_id)
+        self.repo_files: List[str] = list_repo_files(self.repo_id, revision=self.revision)
         self.SUPPORTED_LANGUAGES: Set[str] = self._get_supported_languages()
         self.lang_model: LangIdentPipeline = LangIdentPipeline()
         self.bloomfilters: Dict[str, BloomFilter] = {}
@@ -116,7 +121,8 @@ class OCRQAPipeline:
                 try:
                     self.bloomfilters[bloomfilter_key] = get_bloomfilter(
                         self.repo_id, 
-                        f"ocrqa-wp_v{selected_version}-{detected_language}.bloom"
+                        f"ocrqa-wp_v{selected_version}-{detected_language}.bloom",
+                        self.revision
                     )
                 except Exception as e:
                     raise Exception(f"Failed to download or load BloomFilter for {detected_language} v{selected_version}: {str(e)}")
