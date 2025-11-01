@@ -3,24 +3,8 @@ import unicodedata
 from huggingface_hub import hf_hub_download, list_repo_files
 from pybloomfilter import BloomFilter  # changed import to pybloomfilter3
 import re
-from functools import lru_cache
 
 from impresso_pipelines.langident.langident_pipeline import LangIdentPipeline
-
-
-
-@lru_cache(maxsize=1)
-def cached_list_repo_files(repo_id: str):
-    """
-    Cache the list of files in a Hugging Face repository.
-
-    Args:
-        repo_id (str): The repository ID.
-
-    Returns:
-        List[str]: List of file names in the repository.
-    """
-    return list_repo_files(repo_id)
 
 
 def get_bloomfilter(model_id: str, filename: str):
@@ -41,27 +25,43 @@ class OCRQAPipeline:
     Pipeline for OCR Quality Assessment using BloomFilters.
 
     Attributes:
+        repo_id (str): The Hugging Face repository ID for OCR quality assessment models.
         SUPPORTED_LANGUAGES (set): Set of supported languages.
         lang_model (LangIdentPipeline): Language identification model.
         bloomfilters (dict): Cache for BloomFilter instances.
+        repo_files (list): List of files in the repository (cached at initialization).
     """
-    def __init__(self):
+    
+    DEFAULT_REPO_ID = "impresso-project/OCR-quality-assessment-unigram"
+    
+    def __init__(self, repo_id: Optional[str] = None):
         """
         Initialize the pipeline by loading supported languages and setting up caches.
+        
+        Args:
+            repo_id (Optional[str]): The Hugging Face repository ID. 
+                                    Defaults to "impresso-project/OCR-quality-assessment-unigram".
         """
-        self.SUPPORTED_LANGUAGES = self.get_supported_languages()
-        self.lang_model = LangIdentPipeline()  # Initialize LangIdentPipeline here
+        self.repo_id = repo_id or self.DEFAULT_REPO_ID
+        
+        # Fetch repository files once during initialization
+        self.repo_files = list_repo_files(self.repo_id)
+        self.SUPPORTED_LANGUAGES = self._get_supported_languages()
+        self.lang_model = LangIdentPipeline()
         self.bloomfilters = {}  # Cache for BloomFilter instances
 
-    def get_supported_languages(self) -> set:
+    def _get_supported_languages(self) -> set:
         """
-        Retrieve the set of supported languages from the repository.
+        Retrieve the set of supported languages from the repository files.
 
         Returns:
             set: Supported language codes.
         """
-        repo_files = cached_list_repo_files("impresso-project/OCR-quality-assessment-unigram")
-        languages = {file.split('-')[-1].split('.')[0] for file in repo_files if file.startswith("ocrqa-wp_v")}
+        languages = {
+            file.split('-')[-1].split('.')[0] 
+            for file in self.repo_files 
+            if file.startswith("ocrqa-wp_v")
+        }
         return languages
 
     def __call__(self, text: str, language: Optional[str] = None, version: Optional[str] = None, 
@@ -79,44 +79,64 @@ class OCRQAPipeline:
 
         Returns:
             Dict[str, Union[str, float, Dict]]: Output containing language, score, and optional diagnostics.
-        """
-        self.language = language
-        self.version = version
-        self.diagnostics = diagnostics
-        self.model_id = model_id
-        self.supported_languages = supported_languages
         
-        if self.language is None:
-            lang_result = self.lang_model(text)  # Use the initialized LangIdentPipeline
-            self.language = lang_result["language"]
+        Raises:
+            ValueError: If the language is not supported.
+            Exception: If there are issues downloading or loading the BloomFilter.
+        """
+        # Use local variables instead of instance variables to avoid state pollution
+        detected_language = language
+        selected_version = version
+        
+        try:
+            # Detect language if not provided
+            if detected_language is None:
+                lang_result = self.lang_model(text)
+                detected_language = lang_result["language"]
 
-        if self.language not in self.SUPPORTED_LANGUAGES:
-            raise ValueError(f"Unsupported language: {self.language}")
+            if detected_language not in self.SUPPORTED_LANGUAGES:
+                raise ValueError(f"Unsupported language: {detected_language}. Supported languages: {sorted(self.SUPPORTED_LANGUAGES)}")
 
-        if self.version is None:
-            repo_files = cached_list_repo_files("impresso-project/OCR-quality-assessment-unigram")
-            versions = [
-                re.search(r"_v(\d+\.\d+\.\d+)", file).group(1)
-                for file in repo_files
-                if file.startswith("ocrqa-wp_v") and file.endswith(f"-{self.language}.bloom")
-            ]
-            self.version = max(versions, key=lambda v: list(map(int, v.split('.'))))
+            # Determine version if not provided
+            if selected_version is None:
+                try:
+                    versions = [
+                        re.search(r"_v(\d+\.\d+\.\d+)", file).group(1)
+                        for file in self.repo_files
+                        if file.startswith("ocrqa-wp_v") and file.endswith(f"-{detected_language}.bloom")
+                    ]
+                    if not versions:
+                        raise ValueError(f"No BloomFilter versions found for language: {detected_language}")
+                    selected_version = max(versions, key=lambda v: list(map(int, v.split('.'))))
+                except Exception as e:
+                    raise Exception(f"Failed to retrieve BloomFilter versions: {str(e)}")
 
-        # Check if BloomFilter for the language and version is already cached
-        bloomfilter_key = f"{self.language}_{self.version}"
-        if bloomfilter_key not in self.bloomfilters:
-            self.bloomfilters[bloomfilter_key] = get_bloomfilter(
-                "impresso-project/OCR-quality-assessment-unigram", 
-                f"ocrqa-wp_v{self.version}-{self.language}.bloom"
-            )
-        bf = self.bloomfilters[bloomfilter_key]
+            # Check if BloomFilter for the language and version is already cached
+            bloomfilter_key = f"{detected_language}_{selected_version}"
+            if bloomfilter_key not in self.bloomfilters:
+                try:
+                    self.bloomfilters[bloomfilter_key] = get_bloomfilter(
+                        self.repo_id, 
+                        f"ocrqa-wp_v{selected_version}-{detected_language}.bloom"
+                    )
+                except Exception as e:
+                    raise Exception(f"Failed to download or load BloomFilter for {detected_language} v{selected_version}: {str(e)}")
+            
+            bf = self.bloomfilters[bloomfilter_key]
 
-        output = self.filter_text(text, bf)
+            output = self.filter_text(text, bf, detected_language, selected_version, diagnostics, model_id)
 
-        if self.supported_languages:
-            output["supported_languages"] = list(self.SUPPORTED_LANGUAGES)
+            if supported_languages:
+                output["supported_languages"] = sorted(self.SUPPORTED_LANGUAGES)
 
-        return output
+            return output
+        
+        except ValueError:
+            # Re-raise ValueError as-is (user input errors)
+            raise
+        except Exception as e:
+            # Wrap other exceptions with more context
+            raise Exception(f"OCR quality assessment failed: {str(e)}")
 
     # Define normalization table
     QUOTES_PUNCT = "„•<>!\"#%&'’"
@@ -182,13 +202,18 @@ class OCRQAPipeline:
                     print(f"'{token}' is NOT in the bloom filter.")
 
 
-    def filter_text(self, DE_TEXT: str, bloom_filter: BloomFilter) -> Dict[str, Union[str, float, Dict[str, Union[List[str], str]]]]:
+    def filter_text(self, text: str, bloom_filter: BloomFilter, language: str, version: str, 
+                    include_diagnostics: bool, include_model_id: bool) -> Dict[str, Union[str, float, Dict[str, Union[List[str], str]]]]:
         """
         Filter the text using the BloomFilter and compute a quality score.
 
         Args:
-            DE_TEXT (str): Input text to filter.
+            text (str): Input text to filter.
             bloom_filter (BloomFilter): BloomFilter instance to use.
+            language (str): Language code of the text.
+            version (str): Version of the BloomFilter being used.
+            include_diagnostics (bool): Whether to include diagnostics in the output.
+            include_model_id (bool): Whether to include model ID in the output.
 
         Returns:
             Dict[str, Union[str, float, Dict[str, Union[List[str], str]]]]: Output containing language, score, and optional diagnostics.
@@ -197,7 +222,7 @@ class OCRQAPipeline:
         unknowns = set()
 
         # Normalize and tokenize text
-        normalized_text = self.normalize_text(DE_TEXT)
+        normalized_text = self.normalize_text(text)
         tokens = normalized_text.split()
 
         # Check tokens against the bloom filter
@@ -211,15 +236,15 @@ class OCRQAPipeline:
         score = len(knowns) / (len(knowns) + len(unknowns)) if (len(knowns) + len(unknowns)) > 0 else 0
         score = round(score, 1)
 
-        output = {"language": self.language, "score": score}
+        output = {"language": language, "score": score}
 
-        if self.diagnostics:
+        if include_diagnostics:
             output["diagnostics"] = {
-                "known_tokens": sorted(list(knowns)),
-                "unknown_tokens": sorted(list(unknowns)),
-                "model_id": f"ocrqa-wp_v{self.version}-{self.language}"
+                "known_tokens": sorted(knowns),
+                "unknown_tokens": sorted(unknowns),
+                "model_id": f"ocrqa-wp_v{version}-{language}"
             }
-        elif self.model_id:
-            output["model_id"] = f"ocrqa-wp_v{self.version}-{self.language}"
+        elif include_model_id:
+            output["model_id"] = f"ocrqa-wp_v{version}-{language}"
 
         return output
