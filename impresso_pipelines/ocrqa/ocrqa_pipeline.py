@@ -7,6 +7,36 @@ import re
 from impresso_pipelines.langident.langident_pipeline import LangIdentPipeline
 
 
+# ===== Normalization Tables for Different BloomFilter Versions =====
+
+# v1.x.x normalization constants
+_V1_QUOTES_PUNCT = "„•<>!\"#%&''"
+_V1_ASCII_PUNCT = "()*,./:;?"
+_V1_BRACKETS_SPECIAL = "[]\\~_{}"
+_V1_UNICODE_PUNCT = "\xa1\xab\xb7\xbb\xbf"
+_V1_DASH_CARET = "—^`"
+_V1_SPECIAL_SYMBOLS = "¦§£="
+_V1_HYPHEN = "-"
+_V1_DIGITS = "0123456789"
+
+# v1.x.x normalization table
+_V1_NORMALIZATION_TABLE = str.maketrans(
+    {
+        char: " "
+        for char in (
+            _V1_QUOTES_PUNCT
+            + _V1_ASCII_PUNCT
+            + _V1_BRACKETS_SPECIAL
+            + _V1_UNICODE_PUNCT
+            + _V1_DASH_CARET
+            + _V1_SPECIAL_SYMBOLS
+            + _V1_HYPHEN
+        )
+    }
+    | {char: "0" for char in _V1_DIGITS}
+)
+
+
 def get_bloomfilter(model_id: str, filename: str, revision: str = "main") -> BloomFilter:
     """
     Load a BloomFilter from the Hugging Face Hub.
@@ -234,8 +264,61 @@ class OCRQAPipeline:
             # Re-raise ValueError as-is (user input errors)
             raise
         except Exception as e:
-            # Wrap other exceptions with more context
+                        # Wrap other exceptions with more context
             raise Exception(f"OCR quality assessment failed: {str(e)}")
+
+    def _get_normalization_table(self, major_version: int) -> dict:
+        """
+        Get the normalization table for a specific BloomFilter major version.
+        
+        This method can be overridden in subclasses to add support for additional versions
+        or modify existing normalization tables.
+
+        Args:
+            major_version (int): The major version number of the BloomFilter.
+
+        Returns:
+            dict: The normalization translation table for str.translate().
+        
+        Raises:
+            ValueError: If the major version is not supported.
+        """
+        if major_version == 1:
+            return _V1_NORMALIZATION_TABLE
+        else:
+            raise ValueError(f"Unsupported BloomFilter major version: {major_version}. "
+                           f"Only version 1 is currently supported.")
+
+    def _extract_major_version(self, version: str) -> int:
+        """
+        Extract the major version number from a version string.
+
+        Args:
+            version (str): Version string (e.g., "1.0.5", "2.1.3").
+
+        Returns:
+            int: The major version number.
+        """
+        return int(version.split('.')[0])
+
+    def normalize_text(self, s: str, version: str, unicode_normalize: Optional[str] = "NFKC") -> str:
+        """
+        Normalize text using the appropriate normalization table for the BloomFilter version.
+
+        Args:
+            s (str): Input text to normalize.
+            version (str): BloomFilter version string (e.g., "1.0.5").
+            unicode_normalize (Optional[str]): Unicode normalization form.
+
+        Returns:
+            str: Normalized text.
+        """
+        if unicode_normalize:
+            s = unicodedata.normalize(unicode_normalize, s).lower()
+        
+        major_version: int = self._extract_major_version(version)
+        normalization_table: dict = self._get_normalization_table(major_version)
+        return s.translate(normalization_table)
 
     # Define normalization table
     QUOTES_PUNCT = "„•<>!\"#%&'’"
@@ -320,8 +403,8 @@ class OCRQAPipeline:
         knowns: Set[str] = set()
         unknowns: Set[str] = set()
 
-        # Normalize and tokenize text
-        normalized_text: str = self.normalize_text(text)
+        # Normalize and tokenize text using version-specific normalization
+        normalized_text: str = self.normalize_text(text, version)
         tokens: List[str] = normalized_text.split()
 
         # Check tokens against the bloom filter
