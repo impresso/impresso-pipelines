@@ -66,8 +66,9 @@ class OCRQAPipeline:
     
     DEFAULT_REPO_ID: str = "impresso-project/OCR-quality-assessment-unigram"
     DEFAULT_REVISION: str = "main"
+    DEFAULT_SCORE_PRECISION: int = 2
     
-    def __init__(self, repo_id: Optional[str] = None, revision: str = "main") -> None:
+    def __init__(self, repo_id: Optional[str] = None, revision: str = "main", score_precision: int = 2) -> None:
         """
         Initialize the pipeline by loading supported languages and setting up caches.
         
@@ -75,9 +76,11 @@ class OCRQAPipeline:
             repo_id (Optional[str]): The Hugging Face repository ID. 
                                     Defaults to "impresso-project/OCR-quality-assessment-unigram".
             revision (str): The repository revision (branch, tag, or commit). Defaults to "main".
+            score_precision (int): Number of decimal places for rounding the score. Defaults to 2.
         """
         self.repo_id: str = repo_id or self.DEFAULT_REPO_ID
         self.revision: str = revision
+        self.score_precision: int = score_precision
         
         self.repo_files: List[str] = list_repo_files(self.repo_id, revision=self.revision)
         self.SUPPORTED_LANGUAGES: Set[str] = self._get_supported_languages()
@@ -228,7 +231,6 @@ class OCRQAPipeline:
             if detected_language not in self.SUPPORTED_LANGUAGES:
                 raise ValueError(f"Unsupported language: {detected_language}. Supported languages: {sorted(self.SUPPORTED_LANGUAGES)}")
 
-            # Determine version if not provided
             if selected_version is None:
                 try:
                     versions: List[str] = self._get_available_versions(detected_language)
@@ -238,7 +240,6 @@ class OCRQAPipeline:
                 except Exception as e:
                     raise Exception(f"Failed to retrieve BloomFilter versions: {str(e)}")
 
-            # Check if BloomFilter for the language and version is already cached
             bloomfilter_key: str = f"{detected_language}_{selected_version}"
             if bloomfilter_key not in self.bloomfilters:
                 try:
@@ -253,7 +254,9 @@ class OCRQAPipeline:
             
             bf: BloomFilter = self.bloomfilters[bloomfilter_key]
 
-            output: Dict[str, Union[str, float, List[str]]] = self.filter_text(text, bf, detected_language, selected_version, diagnostics, model_id)
+            output: Dict[str, Union[str, float, List[str]]] = self.filter_text(
+                text, bf, detected_language, selected_version, diagnostics, model_id
+            )
 
             if supported_languages:
                 output["supported_languages"] = sorted(self.SUPPORTED_LANGUAGES)
@@ -261,10 +264,8 @@ class OCRQAPipeline:
             return output
         
         except ValueError:
-            # Re-raise ValueError as-is (user input errors)
             raise
         except Exception as e:
-                        # Wrap other exceptions with more context
             raise Exception(f"OCR quality assessment failed: {str(e)}")
 
     def _get_normalization_table(self, major_version: int) -> dict:
@@ -340,20 +341,17 @@ class OCRQAPipeline:
         knowns: Set[str] = set()
         unknowns: Set[str] = set()
 
-        # Normalize and tokenize text using version-specific normalization
         normalized_text: str = self.normalize_text(text, version)
         tokens: List[str] = normalized_text.split()
 
-        # Check tokens against the bloom filter
         for token in tokens:
             if token in bloom_filter:
                 knowns.add(token)
             else:
                 unknowns.add(token)
 
-        # Compute the score
         score: float = len(knowns) / (len(knowns) + len(unknowns)) if (len(knowns) + len(unknowns)) > 0 else 0
-        score = round(score, 1)
+        score = round(score, self.score_precision)
 
         output: Dict[str, Union[str, float, Dict[str, Union[List[str], str]]]] = {"language": language, "score": score}
 
