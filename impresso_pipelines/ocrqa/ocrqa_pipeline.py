@@ -320,69 +320,6 @@ class OCRQAPipeline:
         normalization_table: dict = self._get_normalization_table(major_version)
         return s.translate(normalization_table)
 
-    # Define normalization table
-    QUOTES_PUNCT = "„•<>!\"#%&'’"
-    ASCII_PUNCT = "()*,./:;?"
-    BRACKETS_SPECIAL = "[]\\~_{}"
-    UNICODE_PUNCT = "\xa1\xab\xb7\xbb\xbf"
-    DASH_CARET = "—^`"
-    SPECIAL_SYMBOLS = "¦§£="
-    HYPHEN = "-"
-    DIGITS = "0123456789"
-
-    NORMALIZATION_TABLE = str.maketrans(
-        {
-            char: " "
-            for char in (
-                QUOTES_PUNCT
-                + ASCII_PUNCT
-                + BRACKETS_SPECIAL
-                + UNICODE_PUNCT
-                + DASH_CARET
-                + SPECIAL_SYMBOLS
-                + HYPHEN
-            )
-        }
-        | {char: "0" for char in DIGITS}
-    )
-
-
-    def normalize_text(self, s: str, unicode_normalize: Optional[str] = "NFKC") -> str:
-        """
-        Normalize text by replacing punctuation with spaces and digits with '0'.
-
-        Args:
-            s (str): Input text to normalize.
-            unicode_normalize (Optional[str]): Unicode normalization form.
-
-        Returns:
-            str: Normalized text.
-        """
-        if unicode_normalize:
-            s = unicodedata.normalize(unicode_normalize, s).lower()
-        return s.translate(self.NORMALIZATION_TABLE)
-
-
-    def filter(self, text: str, bloom_filter: BloomFilter) -> None:
-        """
-        Check tokens in the text against the BloomFilter and print diagnostics.
-
-        Args:
-            text (str): Input text to filter.
-            bloom_filter (BloomFilter): BloomFilter instance to use.
-        """
-        # Normalize and tokenize text
-        normalized_text: str = self.normalize_text(text)
-        tokens: List[str] = normalized_text.split()
-
-        # Check tokens against the bloom filter
-        for token in tokens:
-            if self.diagnostics:
-                if token in bloom_filter:
-                    print(f"'{token}' is in the bloom filter.")
-                else:
-                    print(f"'{token}' is NOT in the bloom filter.")
-
 
     def filter_text(self, text: str, bloom_filter: BloomFilter, language: str, version: str, 
                     include_diagnostics: bool, include_model_id: bool) -> Dict[str, Union[str, float, Dict[str, Union[List[str], str]]]]:
