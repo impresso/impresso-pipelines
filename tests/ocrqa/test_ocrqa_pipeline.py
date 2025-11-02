@@ -1,5 +1,5 @@
 import pytest
-from impresso_pipelines.ocrqa.ocrqa_pipeline import OCRQAPipeline
+from impresso_pipelines.ocrqa.ocrqa_pipeline import OCRQAPipeline, subtokens
 
 def test_ocrqa_pipeline_basic():
     ocrqa_pipeline = OCRQAPipeline()
@@ -146,11 +146,10 @@ def test_ocrqa_pipeline_score_precision():
 
 def test_ocrqa_pipeline_v2_normalization():
     """Test v2 normalization features including OCR artifacts and Luxembourgish support."""
-    ocrqa_pipeline = OCRQAPipeline()
     
-    # Test OCR artifacts preservation (v2 feature) using subtokens
+    # Test OCR artifacts preservation (v2 feature) using module-level subtokens
     text_with_artifacts = "hello~world test|here"
-    tokens = ocrqa_pipeline.subtokens(text_with_artifacts, version="2.0.0")
+    tokens = subtokens(text_with_artifacts, version="2.0.0")
     # In v2, artifacts are preserved as separate tokens
     assert "~" in tokens, "OCR artifact ~ should be a separate token"
     assert "|" in tokens, "OCR artifact | should be a separate token"
@@ -159,14 +158,14 @@ def test_ocrqa_pipeline_v2_normalization():
     
     # Test Luxembourgish apostrophe handling (v2 feature)
     lb_text = "ge'nt kre'en"  # Luxembourgish words with apostrophes after 'e' or 'o'
-    lb_tokens = ocrqa_pipeline.subtokens(lb_text, version="2.0.0", language="lb")
+    lb_tokens = subtokens(lb_text, version="2.0.0", language="lb")
     # In v2 with lb language, word-internal apostrophes should be preserved
     assert "ge'nt" in lb_tokens, "Luxembourgish apostrophes should be preserved in v2"
     assert "kre'en" in lb_tokens, "Luxembourgish apostrophes should be preserved in v2"
     
     # Test that v1 normalization still works
     v1_text = "hello~world"
-    v1_tokens = ocrqa_pipeline.subtokens(v1_text, version="1.0.5")
+    v1_tokens = subtokens(v1_text, version="1.0.5")
     # In v1, ~ is replaced with space, not a separate token
     assert "~" not in v1_tokens, "v1 should not preserve ~ as separate token"
     assert "hello" in v1_tokens
@@ -174,22 +173,22 @@ def test_ocrqa_pipeline_v2_normalization():
     
     # Test digit normalization (both versions)
     text_with_digits = "Price: 100 dollars"
-    v1_tokens_digits = ocrqa_pipeline.subtokens(text_with_digits, version="1.0.5")
-    v2_tokens_digits = ocrqa_pipeline.subtokens(text_with_digits, version="2.0.0")
+    v1_tokens_digits = subtokens(text_with_digits, version="1.0.5")
+    v2_tokens_digits = subtokens(text_with_digits, version="2.0.0")
     assert "000" in v1_tokens_digits, "v1 should normalize digits to 0"
     assert "000" in v2_tokens_digits, "v2 should normalize digits to 0"
     
     # Test min_length filtering
     text = "a bc def ghij"
-    tokens_min1 = ocrqa_pipeline.subtokens(text, version="2.0.0", min_length=1)
-    tokens_min3 = ocrqa_pipeline.subtokens(text, version="2.0.0", min_length=3)
+    tokens_min1 = subtokens(text, version="2.0.0", min_length=1)
+    tokens_min3 = subtokens(text, version="2.0.0", min_length=3)
     assert len(tokens_min1) == 4, "min_length=1 should include all tokens"
     assert len(tokens_min3) == 2, "min_length=3 should only include 'def' and 'ghij'"
     assert "def" in tokens_min3 and "ghij" in tokens_min3
     
     # Test lowercase parameter
     text_upper = "HELLO WORLD"
-    tokens_lower = ocrqa_pipeline.subtokens(text_upper, version="2.0.0", lowercase=True)
-    tokens_no_lower = ocrqa_pipeline.subtokens(text_upper, version="2.0.0", lowercase=False)
+    tokens_lower = subtokens(text_upper, version="2.0.0", lowercase=True)
+    tokens_no_lower = subtokens(text_upper, version="2.0.0", lowercase=False)
     assert "hello" in tokens_lower, "lowercase=True should lowercase text"
     assert "HELLO" in tokens_no_lower, "lowercase=False should preserve case"

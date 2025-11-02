@@ -57,6 +57,129 @@ _V2_NORMALIZATION_TABLE = str.maketrans(
 )
 
 
+# ===== Module-Level Utility Functions =====
+
+def _extract_major_version(version: str) -> int:
+    """
+    Extract the major version number from a version string.
+
+    Args:
+        version (str): Version string (e.g., "1.0.5", "2.1.3").
+
+    Returns:
+        int: The major version number.
+    """
+    return int(version.split('.')[0])
+
+
+def _get_normalization_table(major_version: int) -> dict:
+    """
+    Get the normalization table for a specific BloomFilter major version.
+
+    Args:
+        major_version (int): The major version number of the BloomFilter.
+
+    Returns:
+        dict: The normalization translation table for str.translate().
+    
+    Raises:
+        ValueError: If the major version is not supported.
+    """
+    if major_version == 1:
+        return _V1_NORMALIZATION_TABLE
+    elif major_version == 2:
+        return _V2_NORMALIZATION_TABLE
+    else:
+        raise ValueError(f"Unsupported BloomFilter major version: {major_version}. "
+                       f"Supported versions: 1, 2.")
+
+
+def normalize_text(s: str, version: str, language: Optional[str] = None, 
+                   unicode_normalize: Optional[str] = "NFKC") -> str:
+    """
+    Normalize text using the appropriate normalization table for the BloomFilter version.
+    
+    Note: This function does NOT lowercase. Lowercasing should be done before calling this function
+    (e.g., in subtokens() function) for consistency across versions.
+
+    Args:
+        s (str): Input text to normalize.
+        version (str): BloomFilter version string (e.g., "1.0.5", "2.0.0").
+        language (Optional[str]): Language code (e.g., "lb" for Luxembourgish). Used for v2+ special handling.
+        unicode_normalize (Optional[str]): Unicode normalization form.
+
+    Returns:
+        str: Normalized text.
+    """
+    major_version: int = _extract_major_version(version)
+    
+    # Apply Unicode normalization first
+    if unicode_normalize:
+        s = unicodedata.normalize(unicode_normalize, s)
+    
+    # v2+ Luxembourgish-specific handling: preserve word-internal apostrophes
+    if major_version >= 2 and language == "lb":
+        s = re.sub(rf"(?<=[oe])[{_V2_APOSTROPHES}](?=\S)", _V2_PRIVATE_CHAR, s)
+    
+    # v2+ OCR artifact preservation: add spaces around artifacts
+    if major_version >= 2:
+        for char in _V2_OCR_ARTIFACTS:
+            escaped_char = re.escape(char)
+            s = re.sub(rf"{escaped_char}+", lambda m: f" {m.group()} ", s)
+    
+    # Apply version-specific normalization table
+    normalization_table: dict = _get_normalization_table(major_version)
+    s = s.translate(normalization_table)
+    
+    # v2+ Luxembourgish post-processing: restore apostrophes
+    if major_version >= 2 and language == "lb":
+        s = s.replace(_V2_PRIVATE_CHAR, "'")
+    
+    return s
+
+
+def subtokens(text: str, version: str, language: Optional[str] = None,
+              unicode_normalize: Optional[str] = "NFKC", 
+              min_length: int = 1, lowercase: bool = True) -> List[str]:
+    """
+    Normalize and tokenize text into subtokens.
+    
+    OCR artifact characters become separate tokens, allowing them to be
+    flagged as errors when they don't appear in the lexicon.
+
+    Args:
+        text (str): Input text to tokenize.
+        version (str): BloomFilter version string (e.g., "1.0.5", "2.0.0").
+        language (Optional[str]): Language code (e.g., "lb" for Luxembourgish).
+        unicode_normalize (Optional[str]): Unicode normalization form (default: 'NFKC').
+        min_length (int): Minimum token length to include (default: 1).
+        lowercase (bool): Apply lowercasing as first step (default: True).
+
+    Returns:
+        List[str]: List of normalized tokens.
+        
+    Examples:
+        >>> subtokens("hello~world", version="2.0.0")
+        ['hello', '~', 'world']
+        >>> subtokens("Price: £100", version="2.0.0")
+        ['price', '£', '000']
+        >>> subtokens("ge'nt", version="2.0.0", language="lb")
+        ["ge'nt"]
+    """
+    # Apply lowercasing before normalization (consistent for both v1 and v2)
+    if lowercase:
+        text = text.lower()
+    
+    # Normalize and tokenize
+    tokens = normalize_text(text, version, language, unicode_normalize).split()
+    
+    # Filter by minimum length if needed
+    if min_length > 1:
+        tokens = [tok for tok in tokens if len(tok) >= min_length]
+    
+    return tokens
+
+
 def get_bloomfilter(model_id: str, filename: str, revision: str = "main") -> BloomFilter:
     """
     Load a BloomFilter from the Hugging Face Hub.
@@ -70,6 +193,7 @@ def get_bloomfilter(model_id: str, filename: str, revision: str = "main") -> Blo
         BloomFilter: The loaded BloomFilter instance.
     """
     return BloomFilter.open(hf_hub_download(repo_id=model_id, filename=filename, revision=revision))
+
 
 class OCRQAPipeline:
     """
@@ -288,136 +412,6 @@ class OCRQAPipeline:
         except Exception as e:
             raise Exception(f"OCR quality assessment failed: {str(e)}")
 
-    def _get_normalization_table(self, major_version: int) -> dict:
-        """
-        Get the normalization table for a specific BloomFilter major version.
-        
-        This method can be overridden in subclasses to add support for additional versions
-        or modify existing normalization tables.
-
-        Args:
-            major_version (int): The major version number of the BloomFilter.
-
-        Returns:
-            dict: The normalization translation table for str.translate().
-        
-        Raises:
-            ValueError: If the major version is not supported.
-        """
-        if major_version == 1:
-            return _V1_NORMALIZATION_TABLE
-        elif major_version == 2:
-            return _V2_NORMALIZATION_TABLE
-        else:
-            raise ValueError(f"Unsupported BloomFilter major version: {major_version}. "
-                           f"Supported versions: 1, 2.")
-
-    def _extract_major_version(self, version: str) -> int:
-        """
-        Extract the major version number from a version string.
-
-        Args:
-            version (str): Version string (e.g., "1.0.5", "2.1.3").
-
-        Returns:
-            int: The major version number.
-        """
-        return int(version.split('.')[0])
-
-    def normalize_text(self, s: str, version: str, language: Optional[str] = None, 
-                      unicode_normalize: Optional[str] = "NFKC", lowercase: bool = True) -> str:
-        """
-        Normalize text using the appropriate normalization table for the BloomFilter version.
-
-        Args:
-            s (str): Input text to normalize.
-            version (str): BloomFilter version string (e.g., "1.0.5", "2.0.0").
-            language (Optional[str]): Language code (e.g., "lb" for Luxembourgish). Used for v2+ special handling.
-            unicode_normalize (Optional[str]): Unicode normalization form.
-            lowercase (bool): Whether to apply lowercasing. Defaults to True.
-
-        Returns:
-            str: Normalized text.
-        """
-        major_version: int = self._extract_major_version(version)
-        
-        # Apply Unicode normalization first
-        if unicode_normalize:
-            s = unicodedata.normalize(unicode_normalize, s)
-        
-        # Apply lowercasing if requested (v1 does it here, v2 does it in subtokens)
-        if lowercase and major_version == 1:
-            s = s.lower()
-        
-        # v2+ Luxembourgish-specific handling: preserve word-internal apostrophes
-        if major_version >= 2 and language == "lb":
-            s = re.sub(rf"(?<=[oe])[{_V2_APOSTROPHES}](?=\S)", _V2_PRIVATE_CHAR, s)
-        
-        # v2+ OCR artifact preservation: add spaces around artifacts
-        if major_version >= 2:
-            for char in _V2_OCR_ARTIFACTS:
-                escaped_char = re.escape(char)
-                s = re.sub(rf"{escaped_char}+", lambda m: f" {m.group()} ", s)
-        
-        # Apply version-specific normalization table
-        normalization_table: dict = self._get_normalization_table(major_version)
-        s = s.translate(normalization_table)
-        
-        # v2+ Luxembourgish post-processing: restore apostrophes
-        if major_version >= 2 and language == "lb":
-            s = s.replace(_V2_PRIVATE_CHAR, "'")
-        
-        return s
-
-    def subtokens(self, text: str, version: str, language: Optional[str] = None,
-                  unicode_normalize: Optional[str] = "NFKC", 
-                  min_length: int = 1, lowercase: bool = True) -> List[str]:
-        """
-        Normalize and tokenize text into subtokens.
-        
-        OCR artifact characters become separate tokens, allowing them to be
-        flagged as errors when they don't appear in the lexicon.
-
-        Args:
-            text (str): Input text to tokenize.
-            version (str): BloomFilter version string (e.g., "1.0.5", "2.0.0").
-            language (Optional[str]): Language code (e.g., "lb" for Luxembourgish).
-            unicode_normalize (Optional[str]): Unicode normalization form (default: 'NFKC').
-            min_length (int): Minimum token length to include (default: 1).
-            lowercase (bool): Apply lowercasing as first step (default: True).
-
-        Returns:
-            List[str]: List of normalized tokens.
-            
-        Examples:
-            >>> pipeline = OCRQAPipeline()
-            >>> pipeline.subtokens("hello~world", version="2.0.0")
-            ['hello', '~', 'world']
-            >>> pipeline.subtokens("Price: £100", version="2.0.0")
-            ['price', '£', '000']
-            >>> pipeline.subtokens("ge'nt", version="2.0.0", language="lb")
-            ["ge'nt"]
-        """
-        major_version: int = self._extract_major_version(version)
-        
-        # v2+ applies lowercasing before normalization for better consistency
-        if lowercase and major_version >= 2:
-            text = text.lower()
-        
-        # Normalize the text (v1 lowercases here, v2 already lowercased above)
-        normalized = self.normalize_text(
-            text, version, language, unicode_normalize, 
-            lowercase=(lowercase if major_version == 1 else False)
-        )
-        
-        # Split into tokens
-        tokens = normalized.split()
-        
-        # Filter by minimum length if requested
-        if min_length <= 1:
-            return tokens
-        return [tok for tok in tokens if len(tok) >= min_length]
-
 
     def filter_text(self, text: str, bloom_filter: BloomFilter, language: str, version: str, 
                     include_diagnostics: bool, include_model_id: bool) -> Dict[str, Union[str, float, Dict[str, Union[List[str], str]]]]:
@@ -438,8 +432,8 @@ class OCRQAPipeline:
         knowns: Set[str] = set()
         unknowns: Set[str] = set()
 
-        # Use subtokens() for proper v2-compatible tokenization
-        tokens: List[str] = self.subtokens(text, version, language)
+        # Use module-level subtokens() for proper v2-compatible tokenization
+        tokens: List[str] = subtokens(text, version, language)
 
         for token in tokens:
             if token in bloom_filter:
