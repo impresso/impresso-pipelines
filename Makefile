@@ -17,6 +17,8 @@ help:
 	@echo "  make test-newsagencies    - Run only news agencies tests"
 	@echo "  make test-solrnormalization - Run only Solr normalization tests (requires Java)"
 	@echo "  make test-cov             - Run tests with coverage report"
+	@echo "  make test-log             - Run all tests with INFO logging visible"
+	@echo "  make test-debug           - Run all tests with DEBUG logging visible"
 	@echo "  make lint                 - Run linting checks"
 	@echo "  make format               - Format code with black"
 	@echo "  make type-check           - Run type checking with mypy"
@@ -76,6 +78,12 @@ test-solrnormalization:
 
 test-cov:
 	poetry run pytest --cov=impresso_pipelines --cov-report=html --cov-report=term
+
+test-log:
+	poetry run pytest --log-cli-level=INFO
+
+test-debug:
+	poetry run pytest --log-cli-level=DEBUG -s
 
 test-verbose:
 	poetry run pytest -v
