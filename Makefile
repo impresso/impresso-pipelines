@@ -9,8 +9,9 @@ help:
 	@echo "  make install-editable     - Install in editable mode with pip"
 	@echo "  make install-editable-dev - Install in editable mode with dev tools"
 	@echo "  make setup-lucene         - Download Lucene JARs for Solr normalization tests"
-	@echo "  make test                 - Run all tests"
+	@echo "  make test                 - Run all tests (JVM tests run separately to avoid conflicts)"
 	@echo "  make test-all             - Run all tests (same as test)"
+	@echo "  make test-all-together    - Run all tests in one pytest session (may have JVM conflicts)"
 	@echo "  make test-ocrqa           - Run only OCRQA tests"
 	@echo "  make test-langident       - Run only language identification tests"
 	@echo "  make test-ldatopics       - Run only LDA topics tests (requires Java)"
@@ -56,9 +57,21 @@ setup-lucene:
 
 # Test targets
 test:
-	poetry run pytest
+	@echo "Note: JVM-based tests (ldatopics, solrnormalization) may conflict when run together."
+	@echo "Running non-JVM tests first, then JVM tests separately..."
+	poetry run pytest tests/ocrqa/ tests/langident/ tests/newsagencies/
+	poetry run pytest tests/solrnormalization/
+	poetry run pytest tests/ldatopics/
 
 test-all:
+	@echo "Note: JVM-based tests (ldatopics, solrnormalization) may conflict when run together."
+	@echo "Running non-JVM tests first, then JVM tests separately..."
+	poetry run pytest tests/ocrqa/ tests/langident/ tests/newsagencies/
+	poetry run pytest tests/solrnormalization/
+	poetry run pytest tests/ldatopics/
+
+test-all-together:
+	@echo "WARNING: Running all tests together may cause JVM conflicts!"
 	poetry run pytest
 
 test-ocrqa:
@@ -80,10 +93,16 @@ test-cov:
 	poetry run pytest --cov=impresso_pipelines --cov-report=html --cov-report=term
 
 test-log:
-	poetry run pytest --log-cli-level=INFO
+	@echo "Running tests with INFO logging (JVM tests separately)..."
+	poetry run pytest tests/ocrqa/ tests/langident/ tests/newsagencies/ --log-cli-level=INFO
+	poetry run pytest tests/solrnormalization/ --log-cli-level=INFO
+	poetry run pytest tests/ldatopics/ --log-cli-level=INFO
 
 test-debug:
-	poetry run pytest --log-cli-level=DEBUG -s
+	@echo "Running tests with DEBUG logging (JVM tests separately)..."
+	poetry run pytest tests/ocrqa/ tests/langident/ tests/newsagencies/ --log-cli-level=DEBUG -s
+	poetry run pytest tests/solrnormalization/ --log-cli-level=DEBUG -s
+	poetry run pytest tests/ldatopics/ --log-cli-level=DEBUG -s
 
 test-verbose:
 	poetry run pytest -v

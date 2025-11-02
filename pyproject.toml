@@ -23,7 +23,7 @@ jpype1 = { version = "~1.6", optional = true }
 smart_open = { version = "~6.3", optional = true }
 boto3 = { version = "~1.35", optional = true }
 python-dotenv = { version = "~1.0", optional = true }
-spacy = { version = "~3.8", optional = true }
+spacy = { version = "~3.7", optional = true }
 jsonschema = { version = "~4.23", optional = true }
 
 transformers = { version = "~4.49", optional = true }
@@ -59,3 +59,15 @@ pysolr = "~3.9"
 [build-system]
 build-backend = "poetry.core.masonry.api"
 requires = ["poetry-core>=1.0.0"]
+
+[tool.pytest.ini_options]
+# Run tests in a specific order to avoid JVM conflicts
+# solrnormalization tests should run before ldatopics tests
+# because solrnormalization's JVM check is stricter
+testpaths = ["tests"]
+# Markers for JVM-dependent tests
+markers = [
+    "jvm: marks tests that start a JVM (deselect with '-m \"not jvm\"')",
+    "solr_jvm: marks tests that require Lucene JVM",
+    "mallet_jvm: marks tests that require Mallet JVM",
+]
