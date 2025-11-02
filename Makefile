@@ -1,17 +1,21 @@
-.PHONY: help install install-dev test test-all lint format type-check qa clean setup-lucene
+.PHONY: help install install-dev lock test test-all lint format type-check qa clean setup-lucene
 
 # Default target
 help:
 	@echo "Available commands:"
+	@echo "  make lock                 - Update poetry.lock file"
 	@echo "  make install              - Install the package with all extras (Poetry)"
 	@echo "  make install-dev          - Install with development dependencies (Poetry)"
 	@echo "  make install-editable     - Install in editable mode with pip"
 	@echo "  make install-editable-dev - Install in editable mode with dev tools"
 	@echo "  make setup-lucene         - Download Lucene JARs for Solr normalization tests"
-	@echo "  make test                 - Run tests (skipping JVM-dependent tests)"
-	@echo "  make test-all             - Run all tests including JVM-dependent tests"
+	@echo "  make test                 - Run all tests"
+	@echo "  make test-all             - Run all tests (same as test)"
 	@echo "  make test-ocrqa           - Run only OCRQA tests"
 	@echo "  make test-langident       - Run only language identification tests"
+	@echo "  make test-ldatopics       - Run only LDA topics tests (requires Java)"
+	@echo "  make test-newsagencies    - Run only news agencies tests"
+	@echo "  make test-solrnormalization - Run only Solr normalization tests (requires Java)"
 	@echo "  make test-cov             - Run tests with coverage report"
 	@echo "  make lint                 - Run linting checks"
 	@echo "  make format               - Format code with black"
@@ -19,12 +23,16 @@ help:
 	@echo "  make qa                   - Run all QA checks (test, lint, type-check)"
 	@echo "  make clean                - Remove build artifacts and cache files"
 
+# Lock file target
+lock:
+	poetry lock
+
 # Installation targets
 install:
-	poetry install --all-extras
+	@poetry install --all-extras 2>&1 | grep -q "pyproject.toml changed significantly" && $(MAKE) lock && poetry install --all-extras || poetry install --all-extras
 
 install-dev:
-	poetry install --all-extras --with dev
+	@poetry install --all-extras --with dev 2>&1 | grep -q "pyproject.toml changed significantly" && $(MAKE) lock && poetry install --all-extras --with dev || poetry install --all-extras --with dev
 
 install-editable:
 	pip install -e ".[all]"
@@ -46,31 +54,32 @@ setup-lucene:
 
 # Test targets
 test:
-	IMPRESSO_SKIP_JVM=1 poetry run pytest
+	poetry run pytest
 
 test-all:
 	poetry run pytest
 
 test-ocrqa:
-	IMPRESSO_SKIP_JVM=1 poetry run pytest tests/ocrqa/
+	poetry run pytest tests/ocrqa/
 
 test-langident:
-	IMPRESSO_SKIP_JVM=1 poetry run pytest tests/langident/
+	poetry run pytest tests/langident/
 
 test-ldatopics:
-	IMPRESSO_SKIP_JVM=1 poetry run pytest tests/ldatopics/
+	poetry run pytest tests/ldatopics/
 
 test-newsagencies:
-	IMPRESSO_SKIP_JVM=1 poetry run pytest tests/newsagencies/
+	poetry run pytest tests/newsagencies/
 
 test-solrnormalization:
 	poetry run pytest tests/solrnormalization/
 
 test-cov:
-	IMPRESSO_SKIP_JVM=1 poetry run pytest --cov=impresso_pipelines --cov-report=html --cov-report=term
+	poetry run pytest --cov=impresso_pipelines --cov-report=html --cov-report=term
 
 test-verbose:
-	IMPRESSO_SKIP_JVM=1 poetry run pytest -v
+	poetry run pytest -v
+	poetry run pytest -v
 
 # Code quality targets
 lint:
