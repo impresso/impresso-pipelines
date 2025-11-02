@@ -1,4 +1,4 @@
-.PHONY: help install install-dev lock test test-all lint format type-check qa clean setup-lucene
+.PHONY: help install install-dev lock test test-all lint format type-check qa clean clean-venv clean-lucene setup-lucene
 
 # Detect which tool to use (uv preferred, fallback to poetry)
 UV_AVAILABLE := $(shell command -v uv 2> /dev/null)
@@ -43,6 +43,8 @@ help:
 	@echo "  make type-check           - Run type checking with mypy"
 	@echo "  make qa                   - Run all QA checks (test, lint, type-check)"
 	@echo "  make clean                - Remove build artifacts and cache files"
+	@echo "  make clean-venv           - Remove virtual environment (.venv)"
+	@echo "  make clean-lucene         - Remove Lucene JARs and environment files"
 
 # Lock file target
 lock:
@@ -161,6 +163,15 @@ clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete
 	@echo "Clean complete!"
+
+clean-venv:
+	@echo "Removing virtual environment..."
+	@if [ -d .venv ]; then \
+		rm -rf .venv/; \
+		echo "Virtual environment (.venv) removed!"; \
+	else \
+		echo "No virtual environment found (.venv does not exist)"; \
+	fi
 
 clean-lucene:
 	@echo "Removing Lucene JARs..."
