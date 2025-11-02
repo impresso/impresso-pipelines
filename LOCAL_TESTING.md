@@ -214,7 +214,6 @@ poetry run pytest --showlocals
 
 ## Troubleshooting
 
-## Troubleshooting
 
 ### Issue: "Poetry not found"
 
