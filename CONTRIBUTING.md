@@ -53,10 +53,13 @@ Thank you for your interest in contributing to impresso-pipelines! This document
    ```
 
 4. **Activate the virtual environment (if using Poetry):**
+
    ```bash
    poetry shell
    ```
+
    poetry shell
+
    ```
 
    ```
@@ -87,11 +90,11 @@ make test-newsagencies
 ### Running Tests Without Make
 
 ```bash
-# Skip JVM-dependent tests (recommended for quick local testing)
-IMPRESSO_SKIP_JVM=1 poetry run pytest
+# Quick tests (automatically skips JVM-dependent: ldatopics, solrnormalization)
+poetry run pytest -m "not jvm"  # Or use: make test
 
-# Run all tests including JVM-dependent ones
-poetry run pytest
+# Run all tests including JVM-dependent ones (requires Java)
+poetry run pytest  # Or use: make test-all
 
 # Run specific test file
 poetry run pytest tests/ocrqa/test_ocrqa_pipeline.py
@@ -276,8 +279,8 @@ make test-all
 
 ### Environment Variables
 
-- `IMPRESSO_SKIP_JVM=1`: Skip JVM-dependent tests (Solr normalization)
-- `CLASSPATH`: Path to Lucene JAR files (for Solr normalization)
+- `JAVA_HOME`: Path to Java installation (required for LDA Topics and Solr Normalization pipelines)
+- `CLASSPATH`: Path to Lucene JAR files (for Solr normalization, if using external JARs)
 
 ## Troubleshooting
 
