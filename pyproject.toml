@@ -1,3 +1,44 @@
+[project]
+name = "impresso-pipelines"
+version = "0.4.6.14"
+description = "A custom package containing multiple pipelines simplifying reproducibility of impresso steps"
+authors = [
+    { name = "Glebs Vinarskis", email = "gleb.vinarskis@gmail.com" }
+]
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "cython",
+    "numpy~=1.26",
+    "pysolr",
+]
+
+[project.optional-dependencies]
+langident = ["huggingface_hub", "floret"]
+ocrqa = ["pybloomfilter3", "huggingface_hub", "floret"]
+ldatopics = ["huggingface_hub", "floret", "jpype1~=1.6", "smart_open~=6.3", "boto3~=1.35", "python-dotenv~=1.0", "spacy~=3.7", "jsonschema~=4.23"]
+newsagencies = ["transformers~=4.49", "torch~=2.3", "torchvision~=0.18"]
+solrnormalization = ["jpype1~=1.6", "huggingface_hub", "floret", "pysolr"]
+all = ["pybloomfilter3", "huggingface_hub", "floret", "jpype1~=1.6", "smart_open~=6.3", "boto3~=1.35", "python-dotenv~=1.0", "spacy~=3.7", "transformers~=4.49", "torch~=2.3", "jsonschema~=4.23", "torchvision~=0.18"]
+dev = [
+    "pybloomfilter3",
+    "pytest~=7.2",
+    "jsonschema~=4.23",
+    "pytest-lazy-fixture~=0.6",
+    "torch~=2.3",
+    "transformers~=4.49",
+    "flake8~=6.0",
+    "mypy~=1.2",
+    "pytest-cov~=4.0",
+    "jpype1~=1.6",
+    "huggingface_hub",
+    "floret",
+    "pysolr~=3.9",
+]
+
+[project.urls]
+homepage = "https://github.com/impresso/impresso-pipelines"
+
 [tool.poetry]
 name = "impresso-pipelines"
 version = "0.4.6.14"

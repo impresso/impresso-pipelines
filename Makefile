@@ -1,11 +1,29 @@
 .PHONY: help install install-dev lock test test-all lint format type-check qa clean setup-lucene
 
+# Detect which tool to use (uv preferred, fallback to poetry)
+UV_AVAILABLE := $(shell command -v uv 2> /dev/null)
+ifdef UV_AVAILABLE
+    PYTHON_RUN = uv run
+    INSTALL_CMD = uv sync --extra all --extra dev
+    INSTALL_PROD_CMD = uv sync --extra all
+    LOCK_CMD = uv lock
+    TOOL_NAME = uv
+else
+    PYTHON_RUN = poetry run
+    INSTALL_CMD = poetry install --all-extras --with dev
+    INSTALL_PROD_CMD = poetry install --all-extras
+    LOCK_CMD = poetry lock
+    TOOL_NAME = poetry
+endif
+
 # Default target
 help:
+	@echo "Using tool: $(TOOL_NAME)"
+	@echo ""
 	@echo "Available commands:"
-	@echo "  make lock                 - Update poetry.lock file"
-	@echo "  make install              - Install the package with all extras (Poetry)"
-	@echo "  make install-dev          - Install with development dependencies (Poetry)"
+	@echo "  make lock                 - Update lock file ($(LOCK_CMD))"
+	@echo "  make install              - Install the package with all extras"
+	@echo "  make install-dev          - Install with development dependencies"
 	@echo "  make install-editable     - Install in editable mode with pip"
 	@echo "  make install-editable-dev - Install in editable mode with dev tools"
 	@echo "  make setup-lucene         - Download Lucene JARs for Solr normalization tests"
@@ -28,14 +46,14 @@ help:
 
 # Lock file target
 lock:
-	poetry lock
+	$(LOCK_CMD)
 
 # Installation targets
 install:
-	@poetry install --all-extras 2>&1 | grep -q "pyproject.toml changed significantly" && $(MAKE) lock && poetry install --all-extras || poetry install --all-extras
+	$(INSTALL_PROD_CMD)
 
 install-dev:
-	@poetry install --all-extras --with dev 2>&1 | grep -q "pyproject.toml changed significantly" && $(MAKE) lock && poetry install --all-extras --with dev || poetry install --all-extras --with dev
+	$(INSTALL_CMD)
 
 install-editable:
 	pip install -e ".[all]"
