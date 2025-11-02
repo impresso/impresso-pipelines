@@ -1,12 +1,38 @@
+"""
+LDA topic modeling pipeline using Mallet and SpaCy for multilingual text analysis.
+
+This module provides a complete pipeline for extracting topics from text documents
+using Latent Dirichlet Allocation (LDA) via Mallet. It handles language detection,
+lemmatization with SpaCy, text vectorization, and topic inference.
+
+Supported languages: French (fr), German (de), Luxembourgish (lb)
+
+Example usage:
+    >>> pipeline = LDATopicsPipeline()
+    >>> result = pipeline("This is a sample text for topic modeling.")
+    >>> print(result['topics'])
+    [{'uid': 'tm-fr-all-v2.1.0-t42', 'relevance': 0.85}, ...]
+    
+    >>> # With diagnostics
+    >>> result = pipeline(
+    ...     "Sample text",
+    ...     language="fr",
+    ...     diagnostics_topics=True,
+    ...     min_relevance=0.05
+    ... )
+    >>> print(result['diagnostics_topics'])
+"""
+
 from impresso_pipelines.langident.langident_pipeline import LangIdentPipeline
 from impresso_pipelines.ldatopics.mallet_topic_inferencer import MalletTopicInferencer
 import argparse
 import json
 import os
 import bz2
-from huggingface_hub import hf_hub_download, list_repo_files  # Add list_repo_files import
-import tempfile  # Add import for temporary directory
-import shutil  # Add import for removing directories
+from typing import Dict, List, Any, Optional, Union
+from huggingface_hub import hf_hub_download, list_repo_files
+import tempfile
+import shutil
 import subprocess
 import sys
 import logging
@@ -21,13 +47,45 @@ logger = logging.getLogger(__name__)
 
 class LDATopicsPipeline:
     """
-    Pipeline for topic modeling using Mallet and SpaCy.
-    Handles language detection, lemmatization, vectorization, and topic inference.
+    LDA topic modeling pipeline using Mallet and SpaCy.
+    
+    This pipeline processes text through multiple stages:
+    1. Language detection (if not specified)
+    2. Lemmatization using SpaCy language models
+    3. Text vectorization with Mallet
+    4. Topic inference using pre-trained LDA models
+    
+    The pipeline uses pre-trained topic models from Hugging Face Hub and
+    automatically downloads required Mallet JARs and SpaCy models.
+    
+    Attributes:
+        temp_dir (str): Temporary directory for model files and intermediate outputs
+        temp_output_file: Temporary file handle for Mallet output
+        latest_model (Optional[str]): Version string of the latest topic model
+        doc_counter (int): Counter for auto-generated document names
+        language (Optional[str]): Detected or specified language code
+        
+    Example:
+        >>> pipeline = LDATopicsPipeline()
+        >>> result = pipeline(
+        ...     "Le texte français pour l'analyse",
+        ...     language="fr",
+        ...     min_relevance=0.03
+        ... )
+        >>> print(f"Language: {result['language']}")
+        >>> print(f"Topics: {len(result['topics'])}")
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """
-        Initializes the pipeline, sets up temporary directories, and starts the JVM for Mallet.
+        Initialize the LDA topics pipeline.
+        
+        Sets up temporary directories, downloads Mallet JAR files from Hugging Face,
+        and initializes the Java Virtual Machine (JVM) with Mallet's classpath.
+        
+        Raises:
+            RuntimeError: If JVM cannot be started or Mallet classes are unavailable
+            OSError: If JAVA_HOME is not set and JVM path cannot be determined
         """
         self.temp_dir = tempfile.mkdtemp(prefix="mallet_models_")  # Create temp folder for models
         self.temp_output_file = None  # Placeholder for temporary output file
@@ -75,12 +133,18 @@ class LDATopicsPipeline:
                 raise RuntimeError("JVM started without Mallet jars. Please ensure no other code starts the JVM before LDATopicsPipeline.") from e
 
     
-    def setup_mallet_jars(self):
+    def setup_mallet_jars(self) -> str:
         """
-        Downloads Mallet JAR files from Hugging Face Hub and ensures they are locally available.
+        Download Mallet JAR files from Hugging Face Hub.
+        
+        Downloads mallet.jar and mallet-deps.jar from the impresso-project repository
+        and caches them locally using Hugging Face's download mechanism.
 
         Returns:
-            str: Path to the directory containing the Mallet JAR files.
+            Path to the directory containing the downloaded Mallet JAR files.
+            
+        Note:
+            Files are cached by Hugging Face Hub, so subsequent calls won't re-download.
         """
         jar_files = ["mallet.jar", "mallet-deps.jar"]
         jar_paths = []
@@ -97,20 +161,51 @@ class LDATopicsPipeline:
         return os.path.dirname(jar_paths[0])
 
 
-    def __call__(self, text, language=None, doc_name=None, diagnostics_lemmatization=False, diagnostics_topics=False, min_relevance=0.02):
+    def __call__(
+        self, 
+        text: str, 
+        language: Optional[str] = None, 
+        doc_name: Optional[str] = None, 
+        diagnostics_lemmatization: bool = False, 
+        diagnostics_topics: bool = False, 
+        min_relevance: float = 0.02
+    ) -> Dict[str, Any]:
         """
-        Executes the pipeline on the input text.
+        Execute the complete topic modeling pipeline on input text.
+        
+        Processes text through language detection, lemmatization, vectorization,
+        and topic inference. Returns identified topics with relevance scores.
 
-        Parameters:
-            text (str): Input text for processing.
-            language (str, optional): Language of the text. Auto-detected if None.
-            doc_name (str, optional): Name of the document.
-            diagnostics_lemmatization (bool): Whether to include lemmatization diagnostics.
-            diagnostics_topics (bool): Whether to include topic diagnostics.
-            min_relevance (float): Minimum relevance threshold for topics.
+        Args:
+            text: Input text to process for topic modeling
+            language: Language code ('fr', 'de', 'lb'). Auto-detected if None.
+            doc_name: Document identifier. Auto-generated if None.
+            diagnostics_lemmatization: If True, includes lemmatized text in output
+            diagnostics_topics: If True, includes top-10 words for each topic
+            min_relevance: Minimum topic relevance threshold (must be >= 0.02)
 
         Returns:
-            dict: Processed output with topics and metadata.
+            Dictionary containing:
+                - uid (str): Document identifier
+                - language (str): Language code
+                - topic_model_description (str): Model version info
+                - topics (List[Dict]): List of topics with 'uid' and 'relevance'
+                - min_relevance (float): Applied threshold
+                - diagnostics_lemmatization (str): Only if diagnostics_lemmatization=True
+                - diagnostics_topics (Dict): Only if diagnostics_topics=True
+
+        Raises:
+            ValueError: If min_relevance < 0.02 or language is not supported
+            
+        Example:
+            >>> pipeline = LDATopicsPipeline()
+            >>> result = pipeline(
+            ...     "Le gouvernement a annoncé de nouvelles mesures.",
+            ...     language="fr",
+            ...     min_relevance=0.05
+            ... )
+            >>> for topic in result['topics']:
+            ...     print(f"Topic {topic['uid']}: {topic['relevance']:.3f}")
         """
         self.min_p = min_relevance
         if self.min_p < 0.02:
@@ -146,9 +241,6 @@ class LDATopicsPipeline:
         # PART 5: Return the JSON output
         output = self.json_output(filepath=os.path.join(self.temp_dir, "tmp_output.jsonl"))
 
-
-        # SOME RENAMINGS AND ADDITIONS _____________________________________________________
-
         # for each entry in the output list, add key "topic_model_description" with the value from the config file for the language
         for entry in output:
             entry["topic_model_description"] = TOPIC_MODEL_DESCRIPTIONS[self.language]
@@ -178,19 +270,22 @@ class LDATopicsPipeline:
                     topic["relevance"] = topic.pop("p", None)
                     
 
-
-        # ____________________________________________________________
-
         if doc_name is None:
             self.doc_counter += 1  # Increment the document counter for the next call
         return output[0]  # Returns clean lemmatized text without punctuation
     
-    def find_latest_model_version(self):
+    def find_latest_model_version(self) -> None:
         """
-        Finds the latest version of the topic model for the specified language.
+        Find and set the latest topic model version for the current language.
+        
+        Queries Hugging Face Hub for available model versions and selects the
+        most recent one based on version numbering in filenames.
 
         Raises:
-            ValueError: If no model version is found.
+            ValueError: If no model version is found for the specified language
+            
+        Side effects:
+            Sets self.latest_model to the version string (e.g., "2.1.0")
         """
         repo_id = "impresso-project/mallet-topic-inferencer"
         files = list_repo_files(repo_id)
@@ -204,30 +299,42 @@ class LDATopicsPipeline:
         else:
             raise ValueError(f"Could not get latest version for language: {self.language}")
 
-    def language_detection(self, text):
+    def language_detection(self, text: str) -> str:
         """
-        Detects the language of the input text using LangIdentPipeline.
+        Detect the language of input text using LangIdentPipeline.
 
-        Parameters:
-            text (str): Input text.
+        Args:
+            text: Input text for language detection
 
         Returns:
-            str: Detected language.
+            Detected language code (e.g., 'fr', 'de', 'lb')
+            
+        Side effects:
+            Sets self.language to the detected language code
         """
         lang_model = LangIdentPipeline()
         lang_result = lang_model(text)
         self.language = lang_result["language"]
         return self.language
     
-    def SPACY(self, text):
+    def SPACY(self, text: str) -> str:
         """
-        Lemmatizes the input text using SpaCy based on the detected language.
+        Lemmatize input text using language-specific SpaCy models.
+        
+        Downloads and uses the appropriate SpaCy model based on self.language.
+        The model is configured for the specific topic model version being used.
 
-        Parameters:
-            text (str): Input text.
+        Args:
+            text: Input text to lemmatize
 
         Returns:
-            str: Lemmatized text.
+            Lemmatized text with tokens joined by spaces
+            
+        Raises:
+            ValueError: If no SpaCy model is available for the current language
+            
+        Note:
+            SpaCy models are downloaded automatically if not already present.
         """
         from impresso_pipelines.ldatopics.SPACY import SPACY  # Lazy import
         from impresso_pipelines.ldatopics.config import SUPPORTED_LANGUAGES  # Lazy import
@@ -239,14 +346,20 @@ class LDATopicsPipeline:
         nlp = SPACY(model_id, self.language, self.latest_model)
         return nlp(text)
 
-    def vectorizer_mallet(self, text, output_file, doc_name):
+    def vectorizer_mallet(self, text: str, output_file: str, doc_name: str) -> None:
         """
-        Vectorizes the lemmatized text using Mallet.
+        Vectorize lemmatized text using Mallet's pipeline.
+        
+        Loads the appropriate Mallet pipeline file for the current language and
+        version, then converts text to Mallet's vector format.
 
-        Parameters:
-            text (str): Lemmatized text.
-            output_file (str): Path to the output file.
-            doc_name (str): Name of the document.
+        Args:
+            text: Lemmatized text to vectorize
+            output_file: Path where Mallet output will be written
+            doc_name: Document identifier for tracking
+            
+        Side effects:
+            Writes vectorized output to output_file
         """
         from impresso_pipelines.ldatopics.mallet_vectorizer_changed import MalletVectorizer  # Lazy import
 
@@ -265,9 +378,19 @@ class LDATopicsPipeline:
         else:
             mallet(text, f"doc{self.doc_counter}")
 
-    def mallet_inferencer(self):
+    def mallet_inferencer(self) -> None:
         """
-        Runs the Mallet topic inferencer on the vectorized text.
+        Run Mallet topic inference on vectorized text.
+        
+        Downloads pre-trained topic model files (inferencer and pipe) from Hugging Face,
+        configures the MalletTopicInferencer with appropriate parameters, and executes
+        topic inference.
+        
+        Side effects:
+            Writes inference results to temporary JSONL file in self.temp_dir
+            
+        Note:
+            Uses self.language, self.latest_model, and self.min_p to configure inference.
         """
         lang = self.language  # adjusting calling based on language
 
@@ -317,15 +440,24 @@ class LDATopicsPipeline:
         inferencer.run()
 
     
-    def json_output(self, filepath):
+    def json_output(self, filepath: str) -> List[Dict[str, Any]]:
         """
-        Reads a JSONL file and returns a list of parsed JSON objects.
+        Read and parse JSONL output file from Mallet inference.
+        
+        Reads the inference results file line by line, parsing each as JSON.
+        Skips empty lines and logs warnings for malformed JSON.
 
-        Parameters:
-            filepath (str): Path to the .jsonl file.
+        Args:
+            filepath: Path to the JSONL file to read
 
         Returns:
-            List[dict]: Parsed JSON objects.
+            List of parsed JSON objects (dictionaries) from the file
+            
+        Side effects:
+            Deletes the filepath after reading
+            
+        Note:
+            Handles malformed JSON gracefully by logging warnings and continuing.
         """
         data = []
         with open(filepath, "r", encoding="utf-8") as f:
@@ -342,15 +474,30 @@ class LDATopicsPipeline:
 
         return data
 
-    def add_topic_words_to_output(self, output):
+    def add_topic_words_to_output(self, output: Union[Dict[str, Any], List[Dict[str, Any]]]) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         """
-        Adds top-10 topic words to the output based on precomputed topic descriptions.
+        Add top-10 topic words to output for diagnostic purposes.
+        
+        Downloads pre-computed topic descriptions from Hugging Face, extracts the
+        top 10 words for each topic, and adds them to the output under 'diagnostics_topics'.
 
-        Parameters:
-            output (dict): Processed output.
+        Args:
+            output: Single result dictionary or list of result dictionaries
 
         Returns:
-            dict: Output with added topic diagnostics.
+            Output with added 'diagnostics_topics' field containing top words for each topic
+            
+        Raises:
+            ValueError: If no topic description file is configured for the current language
+            
+        Example output structure:
+            {
+                ...,
+                "diagnostics_topics": {
+                    "tm-fr-all-v2.1.0-t42": ["word1", "word2", ...],
+                    "tm-fr-all-v2.1.0-t15": ["word3", "word4", ...]
+                }
+            }
         """
         from impresso_pipelines.ldatopics.config import TOPIC_MODEL_DESCRIPTIONS_HF
 
