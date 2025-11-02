@@ -18,6 +18,20 @@ This repository contains a Python package designed for modular and efficient tex
 
 ## Installation
 
+### Quick Install (with uv - recommended)
+
+[uv](https://github.com/astral-sh/uv) is an extremely fast Python package installer (10-100x faster than pip):
+
+```bash
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install the package with all dependencies
+uv pip install "impresso-pipelines[all]"
+```
+
+### Standard Install (with pip)
+
 To install the full package with all submodules:
 
 ```bash
@@ -25,6 +39,8 @@ pip install "impresso-pipelines[all]"
 ```
 
 The `[all]` extra installs all dependencies required for each component.
+
+### Install Individual Modules
 
 To install individual modules without unnecessary dependencies, use:
 
@@ -35,6 +51,27 @@ pip install "impresso-pipelines[ldatopics]"         # LDA Topics
 pip install "impresso-pipelines[newsagencies]"      # News Agencies
 pip install "impresso-pipelines[solrnormalization]" # Solr text normalization
 ```
+
+### Development Setup
+
+For contributors, we support both **uv** (faster) and **Poetry**:
+
+```bash
+# Clone the repository
+git clone https://github.com/impresso/impresso-pipelines.git
+cd impresso-pipelines
+
+# Option 1: Using uv (recommended - 3-6x faster)
+uv sync --extra all --extra dev
+
+# Option 2: Using Poetry
+poetry install --all-extras --with dev
+
+# Or use Make (auto-detects uv or Poetry)
+make install-dev
+```
+
+See [UV_MIGRATION.md](UV_MIGRATION.md) for more details on using uv.
 
 ## Usage
 

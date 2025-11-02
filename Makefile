@@ -9,7 +9,7 @@ ifdef UV_AVAILABLE
     LOCK_CMD = uv lock
     TOOL_NAME = uv
 else
-    PYTHON_RUN = poetry run
+    PYTHON_RUN = $(PYTHON_RUN)
     INSTALL_CMD = poetry install --all-extras --with dev
     INSTALL_PROD_CMD = poetry install --all-extras
     LOCK_CMD = poetry lock
@@ -77,72 +77,72 @@ setup-lucene:
 test:
 	@echo "Note: JVM-based tests (ldatopics, solrnormalization) may conflict when run together."
 	@echo "Running non-JVM tests first, then JVM tests separately..."
-	poetry run pytest tests/ocrqa/ tests/langident/ tests/newsagencies/
-	poetry run pytest tests/solrnormalization/
-	poetry run pytest tests/ldatopics/
+	$(PYTHON_RUN) pytest tests/ocrqa/ tests/langident/ tests/newsagencies/
+	$(PYTHON_RUN) pytest tests/solrnormalization/
+	$(PYTHON_RUN) pytest tests/ldatopics/
 
 test-all:
 	@echo "Note: JVM-based tests (ldatopics, solrnormalization) may conflict when run together."
 	@echo "Running non-JVM tests first, then JVM tests separately..."
-	poetry run pytest tests/ocrqa/ tests/langident/ tests/newsagencies/
-	poetry run pytest tests/solrnormalization/
-	poetry run pytest tests/ldatopics/
+	$(PYTHON_RUN) pytest tests/ocrqa/ tests/langident/ tests/newsagencies/
+	$(PYTHON_RUN) pytest tests/solrnormalization/
+	$(PYTHON_RUN) pytest tests/ldatopics/
 
 test-all-together:
 	@echo "WARNING: Running all tests together may cause JVM conflicts!"
-	poetry run pytest
+	$(PYTHON_RUN) pytest
 
 test-ocrqa:
-	poetry run pytest tests/ocrqa/
+	$(PYTHON_RUN) pytest tests/ocrqa/
 
 test-langident:
-	poetry run pytest tests/langident/
+	$(PYTHON_RUN) pytest tests/langident/
 
 test-ldatopics:
-	poetry run pytest tests/ldatopics/
+	$(PYTHON_RUN) pytest tests/ldatopics/
 
 test-newsagencies:
-	poetry run pytest tests/newsagencies/
+	$(PYTHON_RUN) pytest tests/newsagencies/
 
 test-solrnormalization:
-	poetry run pytest tests/solrnormalization/
+	$(PYTHON_RUN) pytest tests/solrnormalization/
 
 test-cov:
-	poetry run pytest --cov=impresso_pipelines --cov-report=html --cov-report=term
+	$(PYTHON_RUN) pytest --cov=impresso_pipelines --cov-report=html --cov-report=term
 
 test-log:
 	@echo "Running tests with INFO logging (JVM tests separately)..."
-	poetry run pytest tests/ocrqa/ tests/langident/ tests/newsagencies/ --log-cli-level=INFO
-	poetry run pytest tests/solrnormalization/ --log-cli-level=INFO
-	poetry run pytest tests/ldatopics/ --log-cli-level=INFO
+	$(PYTHON_RUN) pytest tests/ocrqa/ tests/langident/ tests/newsagencies/ --log-cli-level=INFO
+	$(PYTHON_RUN) pytest tests/solrnormalization/ --log-cli-level=INFO
+	$(PYTHON_RUN) pytest tests/ldatopics/ --log-cli-level=INFO
 
 test-debug:
 	@echo "Running tests with DEBUG logging (JVM tests separately)..."
-	poetry run pytest tests/ocrqa/ tests/langident/ tests/newsagencies/ --log-cli-level=DEBUG -s
-	poetry run pytest tests/solrnormalization/ --log-cli-level=DEBUG -s
-	poetry run pytest tests/ldatopics/ --log-cli-level=DEBUG -s
+	$(PYTHON_RUN) pytest tests/ocrqa/ tests/langident/ tests/newsagencies/ --log-cli-level=DEBUG -s
+	$(PYTHON_RUN) pytest tests/solrnormalization/ --log-cli-level=DEBUG -s
+	$(PYTHON_RUN) pytest tests/ldatopics/ --log-cli-level=DEBUG -s
 
 test-verbose:
-	poetry run pytest -v
-	poetry run pytest -v
+	$(PYTHON_RUN) pytest -v
+	$(PYTHON_RUN) pytest -v
 
 # Code quality targets
 lint:
 	@echo "Running linting checks..."
-	poetry run pylint impresso_pipelines/ || true
-	poetry run flake8 impresso_pipelines/ || true
+	$(PYTHON_RUN) pylint impresso_pipelines/ || true
+	$(PYTHON_RUN) flake8 impresso_pipelines/ || true
 
 format:
 	@echo "Formatting code with black..."
-	poetry run black impresso_pipelines/ tests/
+	$(PYTHON_RUN) black impresso_pipelines/ tests/
 
 format-check:
 	@echo "Checking code formatting..."
-	poetry run black --check impresso_pipelines/ tests/
+	$(PYTHON_RUN) black --check impresso_pipelines/ tests/
 
 type-check:
 	@echo "Running type checks with mypy..."
-	poetry run mypy impresso_pipelines/ || true
+	$(PYTHON_RUN) mypy impresso_pipelines/ || true
 
 # Combined QA target (mimics CI)
 qa: test lint type-check
