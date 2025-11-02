@@ -1,10 +1,52 @@
+"""
+OCR Quality Assessment pipeline using BloomFilter-based lexicon matching.
+
+This module provides a complete pipeline for assessing the quality of OCR-processed text
+by comparing tokens against language-specific lexicons stored as BloomFilters. It supports
+multiple languages and different normalization strategies across BloomFilter versions.
+
+Key features:
+- Automatic language detection using floret models
+- Version-aware text normalization (v1.x.x and v2.x.x BloomFilters)
+- Luxembourgish-specific apostrophe handling (v2+)
+- OCR artifact detection and isolation (v2+)
+- Quality scoring based on lexicon coverage
+
+Supported languages: Multiple European languages including German, French, English, 
+Italian, Luxembourgish, and others (language support depends on available BloomFilters).
+
+Example usage:
+    >>> pipeline = OCRQAPipeline()
+    >>> result = pipeline("This is some OCR text to analyze")
+    >>> print(f"Quality score: {result['score']}")
+    Quality score: 0.95
+    
+    >>> # With diagnostics
+    >>> result = pipeline(
+    ...     "Text with ~artifacts# and errors",
+    ...     language="en",
+    ...     diagnostics=True
+    ... )
+    >>> print(result['diagnostics']['unknown_tokens'])
+    ['~', '#', 'artifacts']
+
+Version differences:
+- v1.x.x: Basic normalization with punctuation and digit handling
+- v2.x.x: Enhanced OCR artifact preservation, Luxembourgish apostrophe support
+
+For detailed normalization behavior, see the normalize_text() and subtokens() functions.
+"""
+
 from typing import List, Dict, Union, Optional, Set
 import unicodedata
 from huggingface_hub import hf_hub_download, list_repo_files
 from pybloomfilter import BloomFilter
 import re
+import logging
 
 from impresso_pipelines.langident.langident_pipeline import LangIdentPipeline
+
+logger = logging.getLogger(__name__)
 
 
 # ===== Normalization Tables for Different BloomFilter Versions =====
@@ -61,29 +103,43 @@ _V2_NORMALIZATION_TABLE = str.maketrans(
 
 def _extract_major_version(version: str) -> int:
     """
-    Extract the major version number from a version string.
+    Extract the major version number from a semantic version string.
 
     Args:
-        version (str): Version string (e.g., "1.0.5", "2.1.3").
+        version: Version string in semantic versioning format (e.g., "1.0.5", "2.1.3")
 
     Returns:
-        int: The major version number.
+        The major version number as an integer
+        
+    Example:
+        >>> _extract_major_version("2.1.3")
+        2
+        >>> _extract_major_version("1.0.5")
+        1
     """
     return int(version.split('.')[0])
 
 
-def _get_normalization_table(major_version: int) -> dict:
+def _get_normalization_table(major_version: int) -> Dict[int, str]:
     """
-    Get the normalization table for a specific BloomFilter major version.
+    Get the character normalization translation table for a BloomFilter version.
+    
+    Returns a str.translate()-compatible dictionary mapping Unicode codepoints
+    to their normalized forms. Different versions use different normalization rules.
 
     Args:
-        major_version (int): The major version number of the BloomFilter.
+        major_version: The major version number of the BloomFilter (1 or 2)
 
     Returns:
-        dict: The normalization translation table for str.translate().
+        Translation table mapping character codepoints to replacement strings
     
     Raises:
-        ValueError: If the major version is not supported.
+        ValueError: If the major version is not supported (not 1 or 2)
+        
+    Example:
+        >>> table = _get_normalization_table(2)
+        >>> "hello!".translate(table)
+        'hello '
     """
     if major_version == 1:
         return _V1_NORMALIZATION_TABLE
@@ -97,19 +153,32 @@ def _get_normalization_table(major_version: int) -> dict:
 def normalize_text(s: str, version: str, language: Optional[str] = None, 
                    unicode_normalize: Optional[str] = "NFKC") -> str:
     """
-    Normalize text using the appropriate normalization table for the BloomFilter version.
+    Normalize text using version-specific rules for BloomFilter comparison.
     
-    Note: This function does NOT lowercase. Lowercasing should be done before calling this function
-    (e.g., in subtokens() function) for consistency across versions.
+    Applies Unicode normalization, handles OCR artifacts, and performs character
+    substitution based on the BloomFilter version. For v2+, special handling is
+    applied for Luxembourgish apostrophes and OCR artifacts are isolated with spaces.
+    
+    **Important**: This function does NOT lowercase. Lowercasing should be done
+    before calling this function (e.g., in subtokens()) for consistency across versions.
 
     Args:
-        s (str): Input text to normalize.
-        version (str): BloomFilter version string (e.g., "1.0.5", "2.0.0").
-        language (Optional[str]): Language code (e.g., "lb" for Luxembourgish). Used for v2+ special handling.
-        unicode_normalize (Optional[str]): Unicode normalization form.
+        s: Input text to normalize
+        version: BloomFilter version string (e.g., "1.0.5", "2.0.0")
+        language: Language code (e.g., "lb" for Luxembourgish). Used for v2+ special handling.
+        unicode_normalize: Unicode normalization form ('NFKC', 'NFC', 'NFD', 'NFKD', or None)
 
     Returns:
-        str: Normalized text.
+        Normalized text with punctuation converted to spaces, digits to '0', 
+        and (v2+) OCR artifacts isolated with surrounding spaces
+        
+    Example:
+        >>> normalize_text("Hello, world!", version="2.0.0")
+        'Hello  world '
+        >>> normalize_text("Price: £100", version="2.0.0")
+        'Price   £  000'
+        >>> normalize_text("ge'nt", version="2.0.0", language="lb")
+        "ge'nt"
     """
     major_version: int = _extract_major_version(version)
     
@@ -128,7 +197,7 @@ def normalize_text(s: str, version: str, language: Optional[str] = None,
             s = re.sub(rf"{escaped_char}+", lambda m: f" {m.group()} ", s)
     
     # Apply version-specific normalization table
-    normalization_table: dict = _get_normalization_table(major_version)
+    normalization_table: Dict[int, str] = _get_normalization_table(major_version)
     s = s.translate(normalization_table)
     
     # v2+ Luxembourgish post-processing: restore apostrophes
@@ -142,29 +211,32 @@ def subtokens(text: str, version: str, language: Optional[str] = None,
               unicode_normalize: Optional[str] = "NFKC", 
               min_length: int = 1, lowercase: bool = True) -> List[str]:
     """
-    Normalize and tokenize text into subtokens.
+    Normalize and tokenize text into subtokens for BloomFilter lookup.
     
-    OCR artifact characters become separate tokens, allowing them to be
+    Applies lowercasing (optional), normalization, and whitespace-based tokenization.
+    OCR artifact characters become separate tokens (v2+), allowing them to be
     flagged as errors when they don't appear in the lexicon.
 
     Args:
-        text (str): Input text to tokenize.
-        version (str): BloomFilter version string (e.g., "1.0.5", "2.0.0").
-        language (Optional[str]): Language code (e.g., "lb" for Luxembourgish).
-        unicode_normalize (Optional[str]): Unicode normalization form (default: 'NFKC').
-        min_length (int): Minimum token length to include (default: 1).
-        lowercase (bool): Apply lowercasing as first step (default: True).
+        text: Input text to tokenize
+        version: BloomFilter version string (e.g., "1.0.5", "2.0.0")
+        language: Language code (e.g., "lb" for Luxembourgish)
+        unicode_normalize: Unicode normalization form (default: 'NFKC')
+        min_length: Minimum token length to include (default: 1)
+        lowercase: Apply lowercasing as first step (default: True)
 
     Returns:
-        List[str]: List of normalized tokens.
+        List of normalized tokens (whitespace-separated after normalization)
         
     Examples:
-        >>> subtokens("hello~world", version="2.0.0")
+        >>> subtokens("Hello~World", version="2.0.0")
         ['hello', '~', 'world']
         >>> subtokens("Price: £100", version="2.0.0")
         ['price', '£', '000']
         >>> subtokens("ge'nt", version="2.0.0", language="lb")
         ["ge'nt"]
+        >>> subtokens("hi", version="2.0.0", min_length=3)
+        []
     """
     # Apply lowercasing before normalization (consistent for both v1 and v2)
     if lowercase:
@@ -182,30 +254,67 @@ def subtokens(text: str, version: str, language: Optional[str] = None,
 
 def get_bloomfilter(model_id: str, filename: str, revision: str = "main") -> BloomFilter:
     """
-    Load a BloomFilter from the Hugging Face Hub.
+    Download and load a BloomFilter from the Hugging Face Hub.
+    
+    Uses Hugging Face's caching mechanism to avoid redundant downloads.
 
     Args:
-        model_id (str): The repository ID.
-        filename (str): The file name of the BloomFilter.
-        revision (str): The repository revision (branch, tag, or commit). Defaults to "main".
+        model_id: The Hugging Face repository ID (e.g., "impresso-project/OCR-quality-assessment-unigram")
+        filename: The BloomFilter filename to download (e.g., "ocrqa-wp_v2.0.0-en.bloom")
+        revision: The repository revision - branch, tag, or commit hash (default: "main")
 
     Returns:
-        BloomFilter: The loaded BloomFilter instance.
+        Loaded BloomFilter instance ready for membership testing
+        
+    Raises:
+        Exception: If download or loading fails
+        
+    Example:
+        >>> bf = get_bloomfilter(
+        ...     "impresso-project/OCR-quality-assessment-unigram",
+        ...     "ocrqa-wp_v2.0.0-en.bloom"
+        ... )
+        >>> "hello" in bf
+        True
     """
     return BloomFilter.open(hf_hub_download(repo_id=model_id, filename=filename, revision=revision))
 
 
 class OCRQAPipeline:
     """
-    Pipeline for OCR Quality Assessment using BloomFilters.
+    OCR Quality Assessment pipeline using BloomFilter-based lexicon matching.
+    
+    This pipeline evaluates OCR text quality by comparing normalized tokens against
+    language-specific lexicons stored as BloomFilters. It automatically detects language,
+    selects appropriate BloomFilter versions, and computes quality scores based on
+    the proportion of recognized tokens.
+    
+    The pipeline supports multiple BloomFilter versions with different normalization
+    strategies, and automatically caches loaded BloomFilters for efficient reuse.
 
     Attributes:
-        repo_id (str): The Hugging Face repository ID for OCR quality assessment models.
-        revision (str): The repository revision (branch, tag, or commit).
-        SUPPORTED_LANGUAGES (set): Set of supported languages.
-        lang_model (LangIdentPipeline): Language identification model.
-        bloomfilters (dict): Cache for BloomFilter instances.
-        repo_files (list): List of files in the repository (cached at initialization).
+        repo_id: Hugging Face repository ID for OCR quality assessment models
+        revision: Repository revision (branch, tag, or commit)
+        score_precision: Number of decimal places for quality score rounding
+        repo_files: List of files in the repository (cached at initialization)
+        SUPPORTED_LANGUAGES: Set of available language codes
+        lang_model: Language identification pipeline
+        bloomfilters: Cache of loaded BloomFilter instances
+        
+    Example:
+        >>> pipeline = OCRQAPipeline()
+        >>> result = pipeline("This is good quality OCR text")
+        >>> print(f"{result['language']}: {result['score']}")
+        en: 0.95
+        
+        >>> # With specific version and diagnostics
+        >>> result = pipeline(
+        ...     "Text with errors",
+        ...     language="en",
+        ...     version="2.0.0",
+        ...     diagnostics=True
+        ... )
+        >>> print(result['diagnostics']['unknown_tokens'])
     """
     
     DEFAULT_REPO_ID: str = "impresso-project/OCR-quality-assessment-unigram"
@@ -214,13 +323,19 @@ class OCRQAPipeline:
     
     def __init__(self, repo_id: Optional[str] = None, revision: str = "main", score_precision: int = 2) -> None:
         """
-        Initialize the pipeline by loading supported languages and setting up caches.
+        Initialize the OCR Quality Assessment pipeline.
+        
+        Connects to Hugging Face Hub, retrieves available BloomFilter files,
+        determines supported languages, and initializes the language detection model.
         
         Args:
-            repo_id (Optional[str]): The Hugging Face repository ID. 
-                                    Defaults to "impresso-project/OCR-quality-assessment-unigram".
-            revision (str): The repository revision (branch, tag, or commit). Defaults to "main".
-            score_precision (int): Number of decimal places for rounding the score. Defaults to 2.
+            repo_id: Hugging Face repository ID. If None, uses DEFAULT_REPO_ID 
+                    ("impresso-project/OCR-quality-assessment-unigram")
+            revision: Repository revision - branch, tag, or commit hash (default: "main")
+            score_precision: Number of decimal places for score rounding (default: 2)
+            
+        Raises:
+            Exception: If repository access or language detection initialization fails
         """
         self.repo_id: str = repo_id or self.DEFAULT_REPO_ID
         self.revision: str = revision
@@ -235,13 +350,20 @@ class OCRQAPipeline:
         """
         Check if a filename matches the BloomFilter naming pattern.
         
-        This method can be overridden in subclasses to support different file naming conventions.
+        Default pattern: files starting with "ocrqa-wp_v" and ending with ".bloom"
+        Override this method in subclasses for custom naming conventions.
 
         Args:
-            filename (str): The filename to check.
+            filename: The filename to check
 
         Returns:
-            bool: True if the filename matches the BloomFilter pattern.
+            True if the filename matches the BloomFilter pattern, False otherwise
+            
+        Example:
+            >>> pipeline._is_bloomfilter_file("ocrqa-wp_v2.0.0-en.bloom")
+            True
+            >>> pipeline._is_bloomfilter_file("other-file.txt")
+            False
         """
         return filename.startswith("ocrqa-wp_v") and filename.endswith(".bloom")
 
@@ -249,37 +371,55 @@ class OCRQAPipeline:
         """
         Extract the language code from a BloomFilter filename.
         
-        This method can be overridden in subclasses to support different file naming conventions.
+        Default pattern: extracts the last component before ".bloom" extension.
+        Override this method in subclasses for custom naming conventions.
 
         Args:
-            filename (str): The filename to parse.
+            filename: The filename to parse (e.g., "ocrqa-wp_v2.0.0-en.bloom")
 
         Returns:
-            str: The language code.
+            The extracted language code (e.g., "en")
+            
+        Example:
+            >>> pipeline._extract_language_from_filename("ocrqa-wp_v2.0.0-en.bloom")
+            'en'
         """
         return filename.split('-')[-1].split('.')[0]
 
     def _extract_version_from_filename(self, filename: str) -> Optional[str]:
         """
-        Extract the version string from a BloomFilter filename.
+        Extract the semantic version string from a BloomFilter filename.
         
-        This method can be overridden in subclasses to support different file naming conventions.
+        Default pattern: extracts version matching "_vX.Y.Z" format.
+        Override this method in subclasses for custom naming conventions.
 
         Args:
-            filename (str): The filename to parse.
+            filename: The filename to parse (e.g., "ocrqa-wp_v2.0.0-en.bloom")
 
         Returns:
-            Optional[str]: The version string (e.g., "1.0.5"), or None if not found.
+            The version string (e.g., "2.0.0"), or None if not found
+            
+        Example:
+            >>> pipeline._extract_version_from_filename("ocrqa-wp_v2.0.0-en.bloom")
+            '2.0.0'
+            >>> pipeline._extract_version_from_filename("invalid-name.bloom")
+            None
         """
         match = re.search(r"_v(\d+\.\d+\.\d+)", filename)
         return match.group(1) if match else None
 
     def _get_supported_languages(self) -> Set[str]:
         """
-        Retrieve the set of supported languages from the repository files.
+        Retrieve the set of supported languages from repository BloomFilter files.
+        
+        Scans all files in the repository, identifies BloomFilter files, and extracts
+        their language codes to build the set of supported languages.
 
         Returns:
-            Set[str]: Supported language codes.
+            Set of language codes (e.g., {'en', 'de', 'fr', 'it'})
+            
+        Note:
+            This method is called during initialization to populate SUPPORTED_LANGUAGES.
         """
         languages: Set[str] = {
             self._extract_language_from_filename(file)
@@ -292,13 +432,18 @@ class OCRQAPipeline:
         """
         Get all available BloomFilter versions for a specific language.
         
-        This method can be overridden in subclasses to support different version retrieval strategies.
+        Scans repository files to find all BloomFilter versions available for the
+        given language. Override this method in subclasses for custom version discovery.
 
         Args:
-            language (str): The language code.
+            language: The language code (e.g., "en", "de", "fr")
 
         Returns:
-            List[str]: List of available version strings.
+            List of version strings (e.g., ["1.0.0", "1.0.5", "2.0.0"])
+            
+        Example:
+            >>> pipeline._get_available_versions("en")
+            ['1.0.0', '1.0.5', '2.0.0']
         """
         versions: List[str] = []
         for file in self.repo_files:
@@ -310,18 +455,23 @@ class OCRQAPipeline:
 
     def _select_latest_version(self, versions: List[str]) -> str:
         """
-        Select the latest version from a list of version strings.
+        Select the latest version from a list of semantic version strings.
         
-        This method can be overridden in subclasses to implement different version selection logic.
+        Compares versions numerically (e.g., "2.0.0" > "1.0.5") and returns the highest.
+        Override this method in subclasses for custom version selection logic.
 
         Args:
-            versions (List[str]): List of version strings (e.g., ["1.0.0", "1.0.5", "2.0.0"]).
+            versions: List of semantic version strings (e.g., ["1.0.0", "1.0.5", "2.0.0"])
 
         Returns:
-            str: The selected version string.
+            The selected (latest) version string
         
         Raises:
-            ValueError: If the versions list is empty.
+            ValueError: If the versions list is empty
+            
+        Example:
+            >>> pipeline._select_latest_version(["1.0.0", "2.0.0", "1.0.5"])
+            '2.0.0'
         """
         if not versions:
             raise ValueError("No versions available")
@@ -331,36 +481,64 @@ class OCRQAPipeline:
         """
         Build the BloomFilter filename for a given version and language.
         
-        This method can be overridden in subclasses to support different file naming conventions.
+        Default format: "ocrqa-wp_vX.Y.Z-LANG.bloom"
+        Override this method in subclasses for custom naming conventions.
 
         Args:
-            version (str): The version string.
-            language (str): The language code.
+            version: The semantic version string (e.g., "2.0.0")
+            language: The language code (e.g., "en")
 
         Returns:
-            str: The BloomFilter filename.
+            The complete BloomFilter filename
+            
+        Example:
+            >>> pipeline._build_bloomfilter_filename("2.0.0", "en")
+            'ocrqa-wp_v2.0.0-en.bloom'
         """
         return f"ocrqa-wp_v{version}-{language}.bloom"
 
     def __call__(self, text: str, language: Optional[str] = None, version: Optional[str] = None, 
-                 diagnostics: bool = False, model_id: bool = False, supported_languages: bool = False) -> Dict[str, Union[str, float, Dict]]:
+                 diagnostics: bool = False, model_id: bool = False, supported_languages: bool = False) -> Dict[str, Union[str, float, List[str], Dict]]:
         """
-        Process the input text and assess its quality using BloomFilters.
+        Assess OCR quality of input text using BloomFilter lexicon matching.
+        
+        Main entry point for the pipeline. Detects language if not specified, selects
+        appropriate BloomFilter version, and computes quality score based on token
+        recognition rate.
 
         Args:
-            text (str): Input text to process.
-            language (Optional[str]): Language code of the text.
-            version (Optional[str]): Version of the BloomFilter to use.
-            diagnostics (bool): Whether to include diagnostics in the output.
-            model_id (bool): Whether to include model ID in the output.
-            supported_languages (bool): Whether to include supported languages in the output.
+            text: Input text to assess
+            language: Language code (e.g., "en"). Auto-detected if None.
+            version: BloomFilter version (e.g., "2.0.0"). Latest version used if None.
+            diagnostics: If True, includes known/unknown tokens in output
+            model_id: If True, includes BloomFilter model ID in output
+            supported_languages: If True, includes list of supported languages in output
 
         Returns:
-            Dict[str, Union[str, float, Dict]]: Output containing language, score, and optional diagnostics.
+            Dictionary containing:
+                - language (str): Detected or specified language code
+                - score (float): Quality score (0.0-1.0, proportion of recognized tokens)
+                - diagnostics (Dict): Only if diagnostics=True, contains:
+                    - known_tokens (List[str]): Tokens found in lexicon
+                    - unknown_tokens (List[str]): Tokens not found in lexicon
+                    - model_id (str): BloomFilter model identifier
+                - model_id (str): Only if model_id=True (and diagnostics=False)
+                - supported_languages (List[str]): Only if supported_languages=True
         
         Raises:
-            ValueError: If the language is not supported.
-            Exception: If there are issues downloading or loading the BloomFilter.
+            ValueError: If language is not supported or no BloomFilter versions found
+            Exception: If BloomFilter download/loading fails or processing errors occur
+            
+        Example:
+            >>> pipeline = OCRQAPipeline()
+            >>> result = pipeline("Good quality text")
+            >>> print(f"Score: {result['score']}")
+            Score: 0.95
+            
+            >>> # With diagnostics
+            >>> result = pipeline("text with ~errors#", diagnostics=True)
+            >>> print(result['diagnostics']['unknown_tokens'])
+            ['~', '#']
         """
         # Use local variables instead of instance variables to avoid state pollution
         detected_language: Optional[str] = language
@@ -414,20 +592,30 @@ class OCRQAPipeline:
 
 
     def filter_text(self, text: str, bloom_filter: BloomFilter, language: str, version: str, 
-                    include_diagnostics: bool, include_model_id: bool) -> Dict[str, Union[str, float, Dict[str, Union[List[str], str]]]]:
+                    include_diagnostics: bool, include_model_id: bool) -> Dict[str, Union[str, float, List[str], Dict[str, Union[List[str], str]]]]:
         """
-        Filter the text using the BloomFilter and compute a quality score.
+        Filter text tokens through BloomFilter and compute quality score.
+        
+        Tokenizes text using version-appropriate normalization, checks each token
+        against the BloomFilter, and calculates the proportion of recognized tokens.
 
         Args:
-            text (str): Input text to filter.
-            bloom_filter (BloomFilter): BloomFilter instance to use.
-            language (str): Language code of the text.
-            version (str): Version of the BloomFilter being used.
-            include_diagnostics (bool): Whether to include diagnostics in the output.
-            include_model_id (bool): Whether to include model ID in the output.
+            text: Input text to filter
+            bloom_filter: Loaded BloomFilter instance for lexicon lookup
+            language: Language code of the text
+            version: BloomFilter version string for proper normalization
+            include_diagnostics: Whether to include token lists in output
+            include_model_id: Whether to include model identifier in output
 
         Returns:
-            Dict[str, Union[str, float, Dict[str, Union[List[str], str]]]]: Output containing language, score, and optional diagnostics.
+            Dictionary containing:
+                - language (str): The language code
+                - score (float): Quality score (0.0-1.0)
+                - diagnostics (Dict): Only if include_diagnostics=True
+                - model_id (str): Only if include_model_id=True (and not diagnostics)
+                
+        Note:
+            Uses module-level subtokens() function for version-compatible tokenization.
         """
         knowns: Set[str] = set()
         unknowns: Set[str] = set()
