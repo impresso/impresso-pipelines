@@ -16,6 +16,7 @@ except ImportError:
     subprocess.check_call([sys.executable, "-m", "pip", "install", "jpype1"])
     import jpype
 
+logger = logging.getLogger(__name__)
 
 
 class LDATopicsPipeline:
@@ -39,14 +40,38 @@ class LDATopicsPipeline:
             # need to add mallet/lib since thats how it saves from hf_hub_download
             classpath = f"{mallet_dir}/mallet.jar:{mallet_dir}/mallet-deps.jar"
             # Start JVM with Mallet's classpath
-            jpype.startJVM(jpype.getDefaultJVMPath(), f"-Djava.class.path={classpath}")
+            # Try to get JVM path, with fallback to JAVA_HOME if default fails
+            try:
+                jvm_path = jpype.getDefaultJVMPath()
+            except Exception as e:
+                # If getDefaultJVMPath() fails, try to use JAVA_HOME or system default
+                java_home = os.environ.get('JAVA_HOME')
+                if java_home:
+                    # Try common JVM library locations
+                    import platform
+                    system = platform.system()
+                    if system == 'Darwin':  # macOS
+                        jvm_path = os.path.join(java_home, 'lib', 'server', 'libjvm.dylib')
+                        if not os.path.exists(jvm_path):
+                            jvm_path = os.path.join(java_home, 'lib', 'jli', 'libjli.dylib')
+                    elif system == 'Linux':
+                        jvm_path = os.path.join(java_home, 'lib', 'server', 'libjvm.so')
+                    else:  # Windows
+                        jvm_path = os.path.join(java_home, 'bin', 'server', 'jvm.dll')
+                    
+                    if not os.path.exists(jvm_path):
+                        raise RuntimeError(f"Could not find JVM library. Please set JAVA_HOME environment variable. Error: {e}")
+                else:
+                    raise RuntimeError(f"Could not find JVM. Please install Java and/or set JAVA_HOME environment variable. Error: {e}")
+            
+            jpype.startJVM(jvm_path, f"-Djava.class.path={classpath}")
         else:
             # JVM already started, check if Mallet classes are available
             try:
                 from cc.mallet.classify.tui import Csv2Vectors
             except ImportError as e:
-                print("[ERROR] JVM is already started but Mallet classes are not available in the classpath.")
-                print("[ERROR] This usually happens if another library started the JVM without Mallet jars.")
+                logger.error("JVM is already started but Mallet classes are not available in the classpath.")
+                logger.error("This usually happens if another library started the JVM without Mallet jars.")
                 raise RuntimeError("JVM started without Mallet jars. Please ensure no other code starts the JVM before LDATopicsPipeline.") from e
 
     
@@ -310,7 +335,7 @@ class LDATopicsPipeline:
                     try:
                         data.append(json.loads(line))
                     except json.JSONDecodeError as e:
-                        print(f"Skipping invalid line: {line}\nError: {e}")
+                        logger.warning(f"Skipping invalid line: {line}\nError: {e}")
 
         # delete the file after reading
         os.remove(filepath)

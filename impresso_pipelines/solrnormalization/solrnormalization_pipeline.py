@@ -6,9 +6,12 @@ import urllib.request
 from typing import List, Dict, Optional
 import tempfile
 import shutil
+import logging
 from ..langident import LangIdentPipeline
 import importlib.resources
 from .lang_configs import LANG_CONFIGS
+
+logger = logging.getLogger(__name__)
 
 class SolrNormalizationPipeline:
     """
@@ -75,7 +78,7 @@ class SolrNormalizationPipeline:
             if hasattr(self, 'temp_dir') and os.path.exists(self.temp_dir):
                 shutil.rmtree(self.temp_dir, ignore_errors=True)
         except Exception as e:
-            print(f"Warning: Cleanup failed: {e}")
+            logger.warning(f"Cleanup failed: {e}")
 
     def _load_snowball_stopwords(self, filepath):
         stopwords = []
@@ -113,10 +116,10 @@ class SolrNormalizationPipeline:
         for name, url in self.jar_urls.items():
             dest = os.path.join(self.lib_dir, os.path.basename(url))
             if not os.path.isfile(dest):
-                print(f"⬇️ Downloading {name}...")
+                logger.info(f"Downloading {name}...")
                 urllib.request.urlretrieve(url, dest)
             else:
-                print(f"✔️ {name} already exists.")
+                logger.debug(f"{name} already exists.")
 
     def _create_stopwords(self):
         """
@@ -139,25 +142,19 @@ class SolrNormalizationPipeline:
         """
         Start the JVM with the required classpath for Lucene libraries.
         """
-        # Allow skipping JVM startup for test environments
-        import os
-        if os.environ.get("IMPRESSO_SKIP_JVM", "0") == "1":
-            # For test environments: skip JVM startup and Lucene class check
-            return
-
         if not jpype.isJVMStarted():
             if self._external_lucene_dir:
                 import glob
                 jar_paths = glob.glob(os.path.join(self._external_lucene_dir, "*.jar"))
-                print("📦 Starting JVM with external lucene_dir classpath:")
+                logger.info("Starting JVM with external lucene_dir classpath:")
                 for j in jar_paths:
-                    print(" -", j)
+                    logger.debug(f"  {j}")
             else:
                 jar_paths = [os.path.join(self.lib_dir, os.path.basename(url)) 
                              for url in self.jar_urls.values()]
-                print("📦 Starting JVM with downloaded classpath:")
+                logger.info("Starting JVM with downloaded classpath:")
                 for j in jar_paths:
-                    print(" -", j)
+                    logger.debug(f"  {j}")
             jpype.startJVM(classpath=jar_paths)
         else:
             # JVM already started, check if Lucene classes are available
@@ -165,8 +162,8 @@ class SolrNormalizationPipeline:
                 from org.apache.lucene.analysis.standard import StandardAnalyzer
                 from org.apache.lucene.analysis.custom import CustomAnalyzer
             except ImportError as e:
-                print("[ERROR] JVM is already started but Lucene classes are not available in the classpath.")
-                print("[ERROR] This usually happens if another library started the JVM without Lucene jars.")
+                logger.error("JVM is already started but Lucene classes are not available in the classpath.")
+                logger.error("This usually happens if another library started the JVM without Lucene jars.")
                 raise RuntimeError("JVM started without Lucene jars. Please ensure no other code starts the JVM before SolrNormalizationPipeline.") from e
 
     def _build_analyzer(self, lang: str):
@@ -256,7 +253,7 @@ class SolrNormalizationPipeline:
         
         if confidence < 0.5:
             detected_lang = "general"
-            print(f"[WARNING] Low confidence ({confidence}) in detected language '{detected_lang}'. Switching to general case. Otherwise, consider providing a specific language code.")
+            logger.warning(f"Low confidence ({confidence}) in detected language '{detected_lang}'. Switching to general case. Otherwise, consider providing a specific language code.")
 
         return detected_lang
     
