@@ -58,12 +58,6 @@ Thank you for your interest in contributing to impresso-pipelines! This document
    poetry shell
    ```
 
-   poetry shell
-
-   ```
-
-   ```
-
 ## Running Tests Locally
 
 The project uses `pytest` for testing. Tests can be run with or without JVM-dependent components.
