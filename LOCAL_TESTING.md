@@ -252,8 +252,6 @@ curl -sSL https://install.python-poetry.org | python3 -
 
 ### Issue: "Module not found"
 
-### Issue: "Module not found"
-
 ```bash
 # Activate virtual environment
 poetry shell
