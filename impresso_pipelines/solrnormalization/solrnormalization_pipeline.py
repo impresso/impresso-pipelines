@@ -19,14 +19,17 @@ class SolrNormalizationPipeline:
     Handles language detection, tokenization, and normalization for 7 supported languages
     """
 
-    LUCENE_VERSION = "9.3.0"
-
-    def __init__(self, lucene_dir: Optional[str] = None):
+    def __init__(self, lucene_dir: Optional[str] = None, lucene_version: str = "9.3.0"):
         """
         Initialize the pipeline, setting up temporary directories, downloading dependencies, and preparing stopwords.
         Supports all languages defined in LANG_CONFIGS.
+        
+        Args:
+            lucene_dir: Optional path to external Lucene JAR directory
+            lucene_version: Lucene version to use (default: "9.3.0")
         """
         self._external_lucene_dir = lucene_dir
+        self.lucene_version = lucene_version
         # Create temporary directory
         self.temp_dir = tempfile.mkdtemp(prefix="solrnorm_")
         self.lib_dir = os.path.join(self.temp_dir, "lib")
@@ -35,8 +38,8 @@ class SolrNormalizationPipeline:
             for lang in LANG_CONFIGS
         }
         self.jar_urls = {
-            "lucene-core": f"https://repo1.maven.org/maven2/org/apache/lucene/lucene-core/{self.LUCENE_VERSION}/lucene-core-{self.LUCENE_VERSION}.jar",
-            "lucene-analysis-common": f"https://repo1.maven.org/maven2/org/apache/lucene/lucene-analysis-common/{self.LUCENE_VERSION}/lucene-analysis-common-{self.LUCENE_VERSION}.jar"
+            "lucene-core": f"https://repo1.maven.org/maven2/org/apache/lucene/lucene-core/{self.lucene_version}/lucene-core-{self.lucene_version}.jar",
+            "lucene-analysis-common": f"https://repo1.maven.org/maven2/org/apache/lucene/lucene-analysis-common/{self.lucene_version}/lucene-analysis-common-{self.lucene_version}.jar"
         }
         self._setup_environment()
         if not self._external_lucene_dir:
