@@ -53,7 +53,7 @@ from impresso_pipelines.solrnormalization import SolrNormalizationPipeline
 For usage examples, refer to the individual README files:
 
 - [Langident Pipeline](README_langident.md)
-- [OCR QA Pipeline](REAMDE_ocrqa.md)
+- [OCR QA Pipeline](README_ocrqa.md)
 - [LDA Topics Pipeline](README_ldatopics.md)
 - [News Agencies Pipeline](README_newsagencies.md)
 - [Solr normalization Pipeline](README_solrnormalization.md)
