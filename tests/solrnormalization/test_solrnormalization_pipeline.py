@@ -4,50 +4,29 @@ import os
 
 from impresso_pipelines.solrnormalization.solrnormalization_pipeline import SolrNormalizationPipeline
 
+@pytest.fixture(scope="session")
+def shared_pipeline():
+    """Create a single pipeline instance for all tests to share (JVM can only start once)."""
+    pipeline = SolrNormalizationPipeline()
+    yield pipeline
+    pipeline.cleanup()
+
 def test_solrnormalization_pipeline_importable():
     """Test that SolrNormalizationPipeline can be imported and instantiated."""
-    pipeline = SolrNormalizationPipeline(lucene_dir="lucene_jars")
+    pipeline = SolrNormalizationPipeline()
     assert pipeline is not None
+    # Don't cleanup - leave for session cleanup
 
-def test_solrnormalization_pipeline_error_on_unsupported_language():
+def test_solrnormalization_pipeline_error_on_unsupported_language(shared_pipeline):
     """Test that unsupported language raises ValueError (no JVM/Lucene needed)."""
-    pipeline = SolrNormalizationPipeline(lucene_dir="lucene_jars")
     with pytest.raises(ValueError):
-        pipeline("This is English text.", lang="ru")
+        shared_pipeline("This is English text.", lang="ru")
 
-@pytest.fixture(scope="session")
-def ensure_jvm():
-    import jpype
-    jar_dir = "lucene_jars"
-    jar_paths = glob.glob(os.path.join(jar_dir, "*.jar"))
-    print(f"[DEBUG] Looking for Lucene JARs in: {jar_dir}")
-    print(f"[DEBUG] Found JARs: {jar_paths}")
-    for jar in jar_paths:
-        print(f"[DEBUG] JAR exists: {jar} -> {os.path.exists(jar)}")
-    if not jar_paths:
-        print("[DEBUG] No Lucene JARs found!")
-    if not jpype.isJVMStarted():
-        try:
-            jpype.startJVM(classpath=jar_paths)
-            print("[DEBUG] JVM started successfully.")
-        except RuntimeError as e:
-            print(f"[DEBUG] JVM failed to start: {e}")
-            pytest.skip("Lucene JARs not available or JVM failed to start", allow_module_level=True)
-    # JVM is started, check if Lucene classes are importable
-    try:
-        from org.apache.lucene.analysis.standard import StandardAnalyzer
-        from org.apache.lucene.analysis.custom import CustomAnalyzer
-        print("[DEBUG] Lucene classes imported successfully.")
-    except ImportError as e:
-        print(f"[DEBUG] Lucene classes not importable: {e}")
-        pytest.skip("Lucene classes not importable in current JVM/classpath. JVM may have been started by another test with a different classpath.", allow_module_level=True)
-
-@pytest.mark.usefixtures("ensure_jvm")
-def test_solrnormalization_pipeline_basic():
-    pipeline = SolrNormalizationPipeline(lucene_dir="lucene_jars")
+def test_solrnormalization_pipeline_basic(shared_pipeline):
+    """Test basic pipeline functionality with automatic JAR download."""
     de_text = "Der Hund läuft schnell durch den Wald und über die Wiese."
 
-    result = pipeline(de_text)
+    result = shared_pipeline(de_text)
 
     # Assert that the pipeline returns a dictionary
     assert isinstance(result, dict)
@@ -59,12 +38,11 @@ def test_solrnormalization_pipeline_basic():
     # Assert that the detected language is 'de'
     assert result['language'] == 'de'
 
-@pytest.mark.usefixtures("ensure_jvm")
-def test_solrnormalization_pipeline_with_language():
-    pipeline = SolrNormalizationPipeline(lucene_dir="lucene_jars")
+def test_solrnormalization_pipeline_with_language(shared_pipeline):
+    """Test pipeline with explicit language specification."""
     fr_text = "Le chien court rapidement à travers la forêt et sur la prairie."
 
-    result = pipeline(fr_text, lang="fr")
+    result = shared_pipeline(fr_text, lang="fr")
 
     # Assert that the pipeline returns a dictionary
     assert isinstance(result, dict)
@@ -76,30 +54,28 @@ def test_solrnormalization_pipeline_with_language():
     # Assert that the specified language is 'fr'
     assert result['language'] == 'fr'
 
-@pytest.mark.usefixtures("ensure_jvm")
-def test_solrnormalization_pipeline_detect_language():
-    pipeline = SolrNormalizationPipeline(lucene_dir="lucene_jars")
+def test_solrnormalization_pipeline_detect_language(shared_pipeline):
+    """Test automatic language detection."""
     de_text = "Der Hund läuft schnell durch den Wald und über die Wiese."
 
-    result = pipeline(de_text)
+    result = shared_pipeline(de_text)
 
     # Assert that the detected language is 'de'
     assert result['language'] == 'de'
-    # Assert that tokens are normalized correctly
+    # Assert that tokens are normalized correctly (stemmed)
     assert "hund" in result['tokens']
     assert "wald" in result['tokens']
-    assert "wiese" in result['tokens']
+    assert "wies" in result['tokens']  # "wiese" gets stemmed to "wies"
 
-@pytest.mark.usefixtures("ensure_jvm")
-def test_solrnormalization_pipeline_detect_language_fr():
-    pipeline = SolrNormalizationPipeline(lucene_dir="lucene_jars")
+def test_solrnormalization_pipeline_detect_language_fr(shared_pipeline):
+    """Test automatic language detection for French."""
     fr_text = "Le chien court rapidement à travers la forêt et sur la prairie."
 
-    result = pipeline(fr_text)
+    result = shared_pipeline(fr_text)
 
     # Assert that the detected language is 'fr'
     assert result['language'] == 'fr'
-    # Assert that tokens are normalized correctly
+    # Assert that tokens are normalized correctly (stemmed, accents removed)
     assert "chien" in result['tokens']
-    assert "forêt" in result['tokens']
-    assert "prairie" in result['tokens']
+    assert "foret" in result['tokens']  # "forêt" gets normalized to "foret" (accent removed)
+    assert "prairi" in result['tokens']  # "prairie" gets stemmed to "prairi"

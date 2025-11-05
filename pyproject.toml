@@ -1,6 +1,47 @@
+[project]
+name = "impresso-pipelines"
+version = "0.4.6.14"
+description = "A custom package containing multiple pipelines simplifying reproducibility of impresso steps"
+authors = [
+    { name = "Glebs Vinarskis", email = "gleb.vinarskis@gmail.com" }
+]
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "cython",
+    "numpy~=1.26",
+    "pysolr",
+]
+
+[project.optional-dependencies]
+langident = ["huggingface_hub", "floret"]
+ocrqa = ["pybloomfilter3", "huggingface_hub", "floret"]
+ldatopics = ["huggingface_hub", "floret", "jpype1~=1.6", "smart_open~=6.3", "boto3~=1.35", "python-dotenv~=1.0", "spacy~=3.7", "jsonschema~=4.23"]
+newsagencies = ["transformers~=4.49", "torch~=2.3", "torchvision~=0.18"]
+solrnormalization = ["jpype1~=1.6", "huggingface_hub", "floret", "pysolr"]
+all = ["pybloomfilter3", "huggingface_hub", "floret", "jpype1~=1.6", "smart_open~=6.3", "boto3~=1.35", "python-dotenv~=1.0", "spacy~=3.7", "transformers~=4.49", "torch~=2.3", "jsonschema~=4.23", "torchvision~=0.18"]
+dev = [
+    "pybloomfilter3",
+    "pytest~=7.2",
+    "jsonschema~=4.23",
+    "pytest-lazy-fixture~=0.6",
+    "torch~=2.3",
+    "transformers~=4.49",
+    "flake8~=6.0",
+    "mypy~=1.2",
+    "pytest-cov~=4.0",
+    "jpype1~=1.6",
+    "huggingface_hub",
+    "floret",
+    "pysolr~=3.9",
+]
+
+[project.urls]
+homepage = "https://github.com/impresso/impresso-pipelines"
+
 [tool.poetry]
 name = "impresso-pipelines"
-version = "0.4.6.13"
+version = "0.4.6.14"
 description = "A custom package containing multiple pipelines simplifying reproducibility of impresso steps"
 authors = ["Glebs Vinarskis <gleb.vinarskis@gmail.com>"]
 readme = "README.md"
@@ -11,24 +52,24 @@ packages = [
 
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = ">=3.11,<3.13"
 cython = "*"
-numpy = "1.26.4"
+numpy = "~1.26"
 huggingface_hub = { version = "*", optional = true }
 floret = { version = "*", optional = true }
 pybloomfilter3 = { version = "*", optional = true }
 pysolr = "*"
 
-jpype1 = { version = "^1.4.1", optional = true }
-smart_open = { version = "^6.3.0", optional = true }
-boto3 = { version = "^1.28.0", optional = true }
-python-dotenv = { version = "^1.0.0", optional = true }
-spacy = { version = "3.8.0", optional = true }
-jsonschema = { version = "4.23.0", optional = true }
+jpype1 = { version = "~1.6", optional = true }
+smart_open = { version = "~6.3", optional = true }
+boto3 = { version = "~1.35", optional = true }
+python-dotenv = { version = "~1.0", optional = true }
+spacy = { version = "~3.7", optional = true }
+jsonschema = { version = "~4.23", optional = true }
 
-transformers = { version = "^4.49.0", optional = true }
-torch = { version = "2.3.0", optional = true }
-torchvision = { version = "0.18.0", optional = true }
+transformers = { version = "~4.49", optional = true }
+torch = { version = "~2.3", optional = true }
+torchvision = { version = "~0.18", optional = true }
 
 [tool.poetry.urls]
 homepage = "https://github.com/impresso/impresso-pipelines"
@@ -41,21 +82,33 @@ newsagencies = ["transformers", "torch", "torchvision"]
 solrnormalization = ["jpype1", "huggingface_hub", "floret", "pysolr"]
 all = ["pybloomfilter3", "huggingface_hub", "floret", "jpype1", "smart_open", "boto3", "python-dotenv", "spacy", "transformers", "torch", "jsonschema"]
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 pybloomfilter3 = "*"
-pytest = "^7.2"
-jsonschema = "^4.23.0"
-pytest-lazy-fixture = "^0.6.3"
-torch = "^2.3.0"
-transformers = "^4.49.0"
-flake8 = "^6.0"
-mypy = "^1.2"
-pytest-cov = "^4.0"  # Optional for test coverage
-jpype1 = "^1.4.1"
+pytest = "~7.2"
+jsonschema = "~4.23"
+pytest-lazy-fixture = "~0.6"
+torch = "~2.3"
+transformers = "~4.49"
+flake8 = "~6.0"
+mypy = "~1.2"
+pytest-cov = "~4.0"
+jpype1 = "~1.6"
 huggingface_hub = "*"
 floret = "*"
-pysolr = "^3.9.0"
+pysolr = "~3.9"
 
 [build-system]
 build-backend = "poetry.core.masonry.api"
 requires = ["poetry-core>=1.0.0"]
+
+[tool.pytest.ini_options]
+# Run tests in a specific order to avoid JVM conflicts
+# solrnormalization tests should run before ldatopics tests
+# because solrnormalization's JVM check is stricter
+testpaths = ["tests"]
+# Markers for JVM-dependent tests
+markers = [
+    "jvm: marks tests that start a JVM (deselect with '-m \"not jvm\"')",
+    "solr_jvm: marks tests that require Lucene JVM",
+    "mallet_jvm: marks tests that require Mallet JVM",
+]

@@ -6,26 +6,44 @@
 [![Contributors](https://img.shields.io/github/contributors/impresso/impresso-pipelines)](https://github.com/impresso/impresso-pipelines/graphs/contributors)
 [![QA Workflow](https://github.com/impresso/impresso-pipelines/actions/workflows/qa.yml/badge.svg)](https://github.com/impresso/impresso-pipelines/actions/workflows/qa.yml)
 
-
 ## Overview
+
 This repository contains a Python package designed for modular and efficient text processing workflows. Currently, it includes the following subpackages:
 
 - **Language Identification Pipeline**: Identifies the language of input text and returns a probability score.
 - **OCR QA Pipeline**: Assesses the quality of OCR text by estimating the proportion of recognized vocabulary items (0–1), using efficient language-specific Bloom filters.
-- **LDA Topic Modeling Pipeline**: Soft clustering of input texts using LDA-based topic modeling. 
+- **LDA Topic Modeling Pipeline**: Soft clustering of input texts using LDA-based topic modeling.
 - **News Agencies Pipeline**: Extracts and ranks news agency entities from text, providing relevance scores and optional links to Wikidata.
 - **Lucene/Solr normalization Pipeline**: Replicates Solr’s language-specific text normalization to clarify how input text is tokenized and indexed in impresso.
 
-
 ## Installation
+
+### Quick Install (with uv - recommended)
+
+[uv](https://github.com/astral-sh/uv) is an extremely fast Python package installer (10-100x faster than pip):
+
+```bash
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install the package with all dependencies
+uv pip install "impresso-pipelines[all]"
+```
+
+### Standard Install (with pip)
+
 To install the full package with all submodules:
+
 ```bash
 pip install "impresso-pipelines[all]"
 ```
+
 The `[all]` extra installs all dependencies required for each component.
 
+### Install Individual Modules
 
 To install individual modules without unnecessary dependencies, use:
+
 ```bash
 pip install "impresso-pipelines[langident]"         # Language Identification
 pip install "impresso-pipelines[ocrqa]"             # OCR QA
@@ -34,8 +52,31 @@ pip install "impresso-pipelines[newsagencies]"      # News Agencies
 pip install "impresso-pipelines[solrnormalization]" # Solr text normalization
 ```
 
+### Development Setup
+
+For contributors, we support both **uv** (faster) and **Poetry**:
+
+```bash
+# Clone the repository
+git clone https://github.com/impresso/impresso-pipelines.git
+cd impresso-pipelines
+
+# Option 1: Using uv (recommended - 3-6x faster)
+uv sync --extra all --extra dev
+
+# Option 2: Using Poetry
+poetry install --all-extras --with dev
+
+# Or use Make (auto-detects uv or Poetry)
+make install-dev
+```
+
+See [UV_MIGRATION.md](UV_MIGRATION.md) for more details on using uv.
+
 ## Usage
-Each pipeline is instantiated from a corresponding class. 
+
+Each pipeline is instantiated from a corresponding class.
+
 ```python
 from impresso_pipelines.langident import LangIdentPipeline
 from impresso_pipelines.ocrqa import OCRQAPipeline
@@ -45,26 +86,69 @@ from impresso_pipelines.solrnormalization import SolrNormalizationPipeline
 ```
 
 ## Pipeline Examples
+
 For usage examples, refer to the individual README files:
 
- - [Langident Pipeline](README_langident.md)
- - [OCR QA Pipeline](REAMDE_ocrqa.md)
- - [LDA Topics Pipeline](README_ldatopics.md)
- - [News Agencies Pipeline](README_newsagencies.md)
- - [Solr normalization Pipeline](README_solrnormalization.md)
-
-
+- [Langident Pipeline](README_langident.md)
+- [OCR QA Pipeline](README_ocrqa.md)
+- [LDA Topics Pipeline](README_ldatopics.md)
+- [News Agencies Pipeline](README_newsagencies.md)
+- [Solr normalization Pipeline](README_solrnormalization.md)
 
 See also the interactive notebooks for further examples:
- - [langident_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/langident_pipeline_demo.ipynb)
- - [ocrqa_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/ocrqa_pipeline_demo.ipynb)
- - [ldatopics_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/ldatopics_pipeline_demo.ipynb)
- - [newsagencies_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/newsagencies_pipeline_demo.ipynb)
- - [solrnormalization_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/solrnormalization_pipeline_demo.ipynb).
+
+- [langident_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/langident_pipeline_demo.ipynb)
+- [ocrqa_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/ocrqa_pipeline_demo.ipynb)
+- [ldatopics_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/ldatopics_pipeline_demo.ipynb)
+- [newsagencies_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/newsagencies_pipeline_demo.ipynb)
+- [solrnormalization_pipeline_demo.ipynb](https://github.com/impresso/impresso-datalab-notebooks/tree/main/annotate/solrnormalization_pipeline_demo.ipynb).
 
 ## Future Plans
+
 Additional functionality will be added to extend use cases and support further processing tasks.
 
+## Local Development
+
+For contributors and developers who want to test locally before pushing to GitHub:
+
+### Quick Start
+
+```bash
+# Clone and install
+git clone https://github.com/impresso/impresso-pipelines.git
+cd impresso-pipelines
+
+# Option 1: Poetry (recommended for full development)
+make install-dev
+
+# Option 2: Pip editable mode (faster for testing changes)
+make install-editable-dev
+
+# Run tests
+make test
+
+# Run all QA checks (mimics CI)
+make qa
+```
+
+### Available Commands
+
+```bash
+make help              # Show all available commands
+make install          # Install package with all extras
+make install-dev      # Install with dev dependencies
+make test             # Run tests (skipping JVM tests)
+make test-all         # Run all tests including JVM tests
+make test-ocrqa       # Run only OCRQA tests
+make test-cov         # Run tests with coverage report
+make lint             # Run linting checks
+make format           # Format code with black
+make type-check       # Run type checking
+make qa               # Run all QA checks
+make clean            # Remove build artifacts
+```
+
+For detailed development instructions, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## About Impresso
 
@@ -85,5 +169,3 @@ This program is provided as open source under the [GNU Affero General Public Lic
 <p align="center">
   <img src="https://github.com/impresso/impresso.github.io/blob/master/assets/images/3x1--Yellow-Impresso-Black-on-White--transparent.png?raw=true" width="350" alt="Impresso Project Logo"/>
 </p>
-
-
