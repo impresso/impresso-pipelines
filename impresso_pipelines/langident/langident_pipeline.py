@@ -3,6 +3,7 @@ Language identification pipeline using the floret model.
 
 This module provides a pipeline for detecting the language of text using
 pre-trained floret models from the Hugging Face Hub.
+
 """
 
 import logging
