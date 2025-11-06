@@ -3,6 +3,7 @@ Language identification pipeline using the floret model.
 
 This module provides a pipeline for detecting the language of text using
 pre-trained floret models from the Hugging Face Hub.
+
 """
 
 import logging
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class LangIdentPipeline:
     """
-    Pipeline for language identification using a pre-trained floret model.
+    Pipeline for language identification using a pre-trained floret model
     
     The pipeline automatically downloads and caches models from Hugging Face Hub.
     If no specific model is provided, it will use the latest version available.
