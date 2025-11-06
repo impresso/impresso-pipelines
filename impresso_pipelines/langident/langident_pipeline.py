@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class LangIdentPipeline:
     """
-    Pipeline for language identification using a pre-trained floret model.
+    Pipeline for language identification using a pre-trained floret model
     
     The pipeline automatically downloads and caches models from Hugging Face Hub.
     If no specific model is provided, it will use the latest version available.
