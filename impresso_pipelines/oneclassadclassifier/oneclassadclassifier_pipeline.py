@@ -356,15 +356,15 @@ class AdClassificationPipeline:
             result = {
                 "id": meta.get("id"),
                 "type": "ad" if is_ad_pred else "non-ad",
-                "promotion_prob": round(promo_prob, 6),
-                "promotion_prob_final": round(final_prob, 6),
-                "ensemble_ad_signal": round(ensemble_ad_signal, 6),
-                "xgenre_top_label": top_label,
-                "xgenre_top_prob": round(top_prob, 6),
-                "threshold_used": round(base_thr, 6),
-                "rule_score": round(rule_score, 3),
-                "rule_confidence": round(rule_confidence, 3),
-                "model_confidence": round(model_confidence, 3),
+                # "promotion_prob": round(promo_prob, 6),
+                # "promotion_prob_final": round(final_prob, 6),
+                # "ensemble_ad_signal": round(ensemble_ad_signal, 6),
+                # "xgenre_top_label": top_label,
+                # "xgenre_top_prob": round(top_prob, 6),
+                # "threshold_used": round(base_thr, 6),
+                # "rule_score": round(rule_score, 3),
+                # "rule_confidence": round(rule_confidence, 3),
+                # "model_confidence": round(model_confidence, 3),
             }
             
             results.append(result)
