@@ -1,6 +1,6 @@
 [project]
 name = "impresso-pipelines"
-version = "0.5.0.3"
+version = "0.5.0.4"
 description = "A custom package containing multiple pipelines simplifying reproducibility of impresso steps"
 authors = [
     { name = "Glebs Vinarskis", email = "gleb.vinarskis@gmail.com" }
@@ -41,7 +41,7 @@ homepage = "https://github.com/impresso/impresso-pipelines"
 
 [tool.poetry]
 name = "impresso-pipelines"
-version = "0.5.0.3"
+version = "0.5.0.4"
 description = "A custom package containing multiple pipelines simplifying reproducibility of impresso steps"
 authors = ["Glebs Vinarskis <gleb.vinarskis@gmail.com>"]
 readme = "README.md"
