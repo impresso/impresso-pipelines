@@ -1,5 +1,5 @@
 """
-Ad Classification Pipeline for historical newspaper content.
+Advertisement Classifier for historical newspaper content.
 
 This pipeline identifies advertisements in historical newspaper text using a fine-tuned
 XLM-RoBERTa model combined with rule-based features and adaptive thresholding.
@@ -121,12 +121,12 @@ def lang_len_threshold(lang: str, n_words: int, lang_thr_map: Dict[str, float],
     return base
 
 
-class AdClassificationPipeline:
+class AdClassifierPipeline:
     """
     Pipeline for classifying advertisements in historical newspaper content.
     
     Usage:
-        pipeline = AdClassificationPipeline()
+        pipeline = AdClassifierPipeline()
         
         # Single text
         result = pipeline("Dies ist ein Beispieltext...")

@@ -7,7 +7,7 @@ This pipeline identifies advertisements in historical newspaper content using a 
 ### Using pip with extras (recommended)
 
 ```bash
-pip install "impresso-pipelines[oneclassadclassifier]"
+pip install "impresso-pipelines[adclassifier]"
 ```
 
 This installs the pipeline with all required dependencies (torch, transformers, numpy).
@@ -23,10 +23,10 @@ For Apple Silicon (M1/M2/M3) Macs, PyTorch will automatically use MPS accelerati
 ## Quick Start
 
 ```python
-from impresso_pipelines.oneclassadclassifier import AdClassificationPipeline
+from impresso_pipelines.adclassifier import AdClassifierPipeline
 
 # Initialize pipeline (downloads model on first use)
-pipeline = AdClassificationPipeline()
+pipeline = AdClassifierPipeline()
 
 # Classify a single text
 result = pipeline("À vendre: Belle villa 5 pièces, CHF 850'000. Tél. 021 123 45 67")
@@ -93,7 +93,7 @@ Each result is a dictionary containing:
 You can customize the pipeline parameters:
 
 ```python
-pipeline = AdClassificationPipeline(
+pipeline = AdClassifierPipeline(
     model_name="impresso-project/impresso-ad-classification-xlm-one-class",
     batch_size=16,              # Batch size for GPU processing
     max_length=512,             # Maximum tokens per chunk
@@ -117,9 +117,9 @@ The pipeline automatically detects and uses:
 
 You can manually specify the device:
 ```python
-pipeline = AdClassificationPipeline(device="cuda")  # Force CUDA
-pipeline = AdClassificationPipeline(device="mps")   # Force MPS (Apple Silicon)
-pipeline = AdClassificationPipeline(device="cpu")   # Force CPU
+pipeline = AdClassifierPipeline(device="cuda")  # Force CUDA
+pipeline = AdClassifierPipeline(device="mps")   # Force MPS (Apple Silicon)
+pipeline = AdClassifierPipeline(device="cpu")   # Force CPU
 ```
 
 ## Model Details
@@ -153,7 +153,7 @@ The pipeline combines neural predictions with rule-based features for improved a
 
 ## Examples
 
-See [`impresso_pipelines/oneclassadclassifier/example_usage.py`](impresso_pipelines/oneclassadclassifier/example_usage.py) for complete examples.
+See [`impresso_pipelines/adclassifier/old/example_usage.py`](impresso_pipelines/adclassifier/old/example_usage.py) for complete examples.
 
 ## Performance
 

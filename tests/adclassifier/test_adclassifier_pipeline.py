@@ -1,19 +1,19 @@
 """
-Tests for the Ad Classification Pipeline.
+Tests for the Advertisement Classifier.
 """
 
 import pytest
-from impresso_pipelines.oneclassadclassifier import AdClassificationPipeline
+from impresso_pipelines.adclassifier import AdClassifierPipeline
 
 
 @pytest.fixture
 def pipeline():
-    """Create an AdClassificationPipeline instance."""
-    return AdClassificationPipeline()
+    """Create an AdClassifierPipeline instance."""
+    return AdClassifierPipeline()
 
 
-class TestAdClassificationPipeline:
-    """Test suite for AdClassificationPipeline."""
+class TestAdClassifierPipeline:
+    """Test suite for AdClassifierPipeline."""
 
     def test_pipeline_initialization(self, pipeline):
         """Test that the pipeline initializes correctly."""
@@ -169,13 +169,13 @@ class TestAdClassificationPipeline:
 @pytest.mark.parametrize("device", ["cpu"])
 def test_device_specification(device):
     """Test that device can be specified explicitly."""
-    pipeline = AdClassificationPipeline(device=device)
+    pipeline = AdClassifierPipeline(device=device)
     assert pipeline.device == device
 
 
 def test_custom_parameters():
     """Test that custom parameters can be set."""
-    pipeline = AdClassificationPipeline(
+    pipeline = AdClassifierPipeline(
         batch_size=8,
         ad_threshold=0.5,
         temperature=1.0
