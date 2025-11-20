@@ -154,6 +154,7 @@ class AdClassifierPipeline:
         short_bonus: float = 0.2,
         temperature: float = 0.8,
         device: Optional[str] = None,
+        diagnostics: bool = False,
     ):
         """
         Initialize the ad classification pipeline.
@@ -180,7 +181,7 @@ class AdClassifierPipeline:
         self.short_bonus = short_bonus
         self.temperature = temperature
         self.lang_thr_map = parse_lang_thresholds(lang_thresholds) if lang_thresholds else {}
-        
+        self.diagnostics = diagnostics
         # Auto-detect device
         if device is None:
             if torch.cuda.is_available():
@@ -190,14 +191,12 @@ class AdClassifierPipeline:
             else:
                 device = "cpu"
         self.device = device
-        
         # Load model and tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
         self.model = AutoModelForSequenceClassification.from_pretrained(
             model_name, trust_remote_code=True
         )
         self.model.to(self.device).eval()
-        
         self.id2label = self.model.config.id2label
         self.promo_id = None
         for i, lab in self.id2label.items():
@@ -209,24 +208,23 @@ class AdClassifierPipeline:
     
     def __call__(
         self, 
-        inputs: Union[str, List[str], Dict[str, Any], List[Dict[str, Any]]]
+        inputs: Union[str, List[str], Dict[str, Any], List[Dict[str, Any]]],
+        precision: int = 2
     ) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         """
         Classify text(s) as ad or non-ad.
         
         Args:
             inputs: Text string, list of strings, dict with 'ft' field, or list of dicts
-            
+            precision: Number of decimal places for float results (default 2)
         Returns:
             Dictionary or list of dictionaries with classification results
         """
         # Normalize inputs to list of dicts
         normalized_inputs = self._normalize_inputs(inputs)
         is_single = isinstance(inputs, (str, dict))
-        
         # Process
-        results = self._process_batch(normalized_inputs)
-        
+        results = self._process_batch(normalized_inputs, precision=precision)
         # Return single result or list
         return results[0] if is_single else results
     
@@ -249,32 +247,26 @@ class AdClassifierPipeline:
         else:
             raise ValueError(f"Unsupported input type: {type(inputs)}")
     
-    def _process_batch(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _process_batch(self, items: List[Dict[str, Any]], precision: int = 2) -> List[Dict[str, Any]]:
         """Process a batch of items."""
         results = []
-        
         # Prepare chunks for all items
         all_texts = []
         all_meta = []
         all_chunk_counts = []
         all_chunk_lens = []
-        
         for item in items:
             txt = item.get("ft", "")
             txt = normalize_text(txt)
-            
             if self.chunk_words > 0:
                 parts = list(chunk_words(txt, self.chunk_words))
             else:
                 parts = [txt]
-            
             lens = [len(p.split()) for p in parts]
-            
             all_texts.extend(parts)
             all_meta.append(item)
             all_chunk_counts.append(len(parts))
             all_chunk_lens.extend(lens)
-        
         # Process in batches
         all_logits = []
         for i in range(0, len(all_texts), self.batch_size):
@@ -287,88 +279,74 @@ class AdClassifierPipeline:
                 return_tensors="pt"
             )
             enc = {k: v.to(self.device) for k, v in enc.items()}
-            
             with torch.no_grad():
                 logits = self.model(**enc).logits
             all_logits.append(logits.cpu().numpy())
-        
         all_logits = np.concatenate(all_logits, axis=0)
-        
         # Process each item
         pos = 0
         for meta, n_chunks in zip(all_meta, all_chunk_counts):
             L = all_logits[pos:pos+n_chunks]
             lens = all_chunk_lens[pos:pos+n_chunks]
             pos += n_chunks
-            
             # Pool across chunks
             pooled_probs = self._pool_logits(L, lens)
-            
             promo_prob = float(pooled_probs[self.promo_id])
             top_id = int(np.argmax(pooled_probs))
             top_label = self.id2label[top_id]
             top_prob = float(pooled_probs[top_id])
-            
             # Calculate ensemble signal
             ensemble_ad_signal = calculate_ensemble_ad_signal(
                 promo_prob, top_label, pooled_probs, self.id2label
             )
-            
             # Get text and language
             lg = (meta.get("lg") or meta.get("lang") or "").lower()
             text_raw = meta.get("ft", "")
             text_norm = normalize_text(text_raw)
             flags = rule_flags(text_norm)
-            
             # Calculate threshold
             base_thr = lang_len_threshold(
                 lg, flags["len_words"], self.lang_thr_map, 
                 self.ad_threshold, self.short_bonus, self.short_len
             )
-            
             # Blend probabilities with ensemble signal
             final_prob = promo_prob * 0.85 + ensemble_ad_signal * 0.15
-            
             # Apply rule-based adjustments
             rule_score, rule_confidence = calculate_rule_score_and_confidence(flags)
             model_confidence = abs(promo_prob - 0.5) * 2
             model_uncertainty = 1.0 - model_confidence
-            
             if model_confidence < 0.75:
                 rule_influence = 0.3 + (model_uncertainty * 1.2)
-                
                 if rule_confidence > 0.7 and rule_score >= 4.0:
                     boost = max(0.15 * rule_influence, 0.03)
                     final_prob = max(final_prob, base_thr + boost)
                 elif rule_confidence > 0.5 and rule_score >= 3.0:
                     boost = max(0.12 * rule_influence, 0.02)
                     final_prob = max(final_prob, base_thr + boost)
-                
                 # Combination bonuses
                 if flags["has_price"] and flags["has_phone"]:
                     combination_boost = 0.16 * rule_influence
                     final_prob = max(final_prob, min(final_prob + combination_boost, 0.92))
-            
             # Final classification
             is_ad_pred = bool(final_prob >= base_thr)
-            
             # Build result
             result = {
                 "id": meta.get("id"),
                 "type": "ad" if is_ad_pred else "non-ad",
-                # "promotion_prob": round(promo_prob, 6),
-                # "promotion_prob_final": round(final_prob, 6),
-                # "ensemble_ad_signal": round(ensemble_ad_signal, 6),
-                # "xgenre_top_label": top_label,
-                # "xgenre_top_prob": round(top_prob, 6),
-                # "threshold_used": round(base_thr, 6),
-                # "rule_score": round(rule_score, 3),
-                # "rule_confidence": round(rule_confidence, 3),
-                # "model_confidence": round(model_confidence, 3),
             }
-            
+            if self.diagnostics:
+                result.update({
+                    "promotion_prob": round(promo_prob, precision),
+                    "promotion_prob_final": round(final_prob, precision),
+                    "ensemble_ad_signal": round(ensemble_ad_signal, precision),
+                    "xgenre_top_label": top_label,
+                    "xgenre_top_prob": round(top_prob, precision),
+                    "threshold_used": round(base_thr, precision),
+                    "rule_score": round(rule_score, precision),
+                    "rule_confidence": round(rule_confidence, precision),
+                    "model_confidence": round(model_confidence, precision),
+                })
             results.append(result)
-        
         return results
     
     def _pool_logits(self, L: np.ndarray, lens: List[int]) -> np.ndarray:
