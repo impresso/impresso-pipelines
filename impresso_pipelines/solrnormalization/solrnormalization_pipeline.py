@@ -281,7 +281,7 @@ class SolrNormalizationPipeline:
                 logger.error("This usually happens if another library started the JVM without Lucene jars.")
                 raise RuntimeError("JVM started without Lucene jars. Please ensure no other code starts the JVM before SolrNormalizationPipeline.") from e
 
-    def _build_analyzer(self, lang: str) -> Any:
+    def _build_analyzer(self, lang: str, remove_stopwords: bool = True) -> Any:
         """
         Build a custom Lucene analyzer for a specific language.
         
@@ -291,6 +291,7 @@ class SolrNormalizationPipeline:
         
         Args:
             lang: Language code (e.g., 'de', 'fr', 'en')
+            remove_stopwords: Whether to remove stopwords (default: True)
         
         Returns:
             Lucene CustomAnalyzer instance configured for the specified language
@@ -318,11 +319,12 @@ class SolrNormalizationPipeline:
                 builder = builder.withTokenizer(step["name"])
             elif step["type"] == "tokenfilter":
                 if step["name"] == "stop":
-                    stop_params = HashMap()
-                    for k, v in config.get("stop_params", {}).items():
-                        stop_params.put(k, v)
-                    stop_params.put("words", self.stopwords[lang])
-                    builder = builder.addTokenFilter("stop", stop_params)
+                    if remove_stopwords:
+                        stop_params = HashMap()
+                        for k, v in config.get("stop_params", {}).items():
+                            stop_params.put(k, v)
+                        stop_params.put("words", self.stopwords[lang])
+                        builder = builder.addTokenFilter("stop", stop_params)
                 elif step["name"] == "elision":
                     elision_params = HashMap()
                     for k, v in config.get("elision_params", {}).items():
@@ -410,7 +412,8 @@ class SolrNormalizationPipeline:
         self, 
         text: str, 
         lang: Optional[str] = None, 
-        diagnostics: Optional[bool] = False
+        diagnostics: Optional[bool] = False,
+        remove_stopwords: bool = True
     ) -> Dict[str, Any]:
         """
         Process text through the normalization pipeline.
@@ -422,6 +425,7 @@ class SolrNormalizationPipeline:
             text: Input text to normalize
             lang: Optional language code (e.g., 'de', 'fr'). If None, language is auto-detected.
             diagnostics: If True, includes additional debugging information in output
+            remove_stopwords: Whether to remove stopwords (default: True)
             
         Returns:
             Dictionary containing:
@@ -452,10 +456,12 @@ class SolrNormalizationPipeline:
 
         self._start_jvm()
 
-        if detected_lang not in self._analyzers:
-            self._analyzers[detected_lang] = self._build_analyzer(detected_lang)
+        # Create cache key based on language and stopwords setting
+        analyzer_key = (detected_lang, remove_stopwords)
+        if analyzer_key not in self._analyzers:
+            self._analyzers[analyzer_key] = self._build_analyzer(detected_lang, remove_stopwords)
 
-        tokens = self._analyze_text(self._analyzers[detected_lang], text)
+        tokens = self._analyze_text(self._analyzers[analyzer_key], text)
 
         if diagnostics:
             stopword_file = LANG_CONFIGS[detected_lang].get("stopwords_file")
