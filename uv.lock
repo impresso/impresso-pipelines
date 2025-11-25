@@ -372,7 +372,7 @@ wheels = [
 
 [[package]]
 name = "impresso-pipelines"
-version = "0.5.0.4"
+version = "0.5.0.5"
 source = { editable = "." }
 dependencies = [
     { name = "cython" },
