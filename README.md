@@ -14,7 +14,8 @@ This repository contains a Python package designed for modular and efficient tex
 - **OCR QA Pipeline**: Assesses the quality of OCR text by estimating the proportion of recognized vocabulary items (0–1), using efficient language-specific Bloom filters.
 - **LDA Topic Modeling Pipeline**: Soft clustering of input texts using LDA-based topic modeling.
 - **News Agencies Pipeline**: Extracts and ranks news agency entities from text, providing relevance scores and optional links to Wikidata.
-- **Lucene/Solr normalization Pipeline**: Replicates Solr’s language-specific text normalization to clarify how input text is tokenized and indexed in impresso.
+- **Advertisement Classifier**: Identifies advertisements in historical newspaper content using a fine-tuned XLM-RoBERTa model with rule-based features.
+- **Lucene/Solr normalization Pipeline**: Replicates Solr's language-specific text normalization to clarify how input text is tokenized and indexed in impresso.
 
 ## Installation
 
@@ -49,6 +50,7 @@ pip install "impresso-pipelines[langident]"         # Language Identification
 pip install "impresso-pipelines[ocrqa]"             # OCR QA
 pip install "impresso-pipelines[ldatopics]"         # LDA Topics
 pip install "impresso-pipelines[newsagencies]"      # News Agencies
+pip install "impresso-pipelines[adclassifier]"      # Advertisement Classifier
 pip install "impresso-pipelines[solrnormalization]" # Solr text normalization
 ```
 
@@ -82,6 +84,7 @@ from impresso_pipelines.langident import LangIdentPipeline
 from impresso_pipelines.ocrqa import OCRQAPipeline
 from impresso_pipelines.ldatopics import LDATopicsPipeline
 from impresso_pipelines.newsagencies import NewsAgenciesPipeline
+from impresso_pipelines.adclassifier import AdClassifierPipeline
 from impresso_pipelines.solrnormalization import SolrNormalizationPipeline
 ```
 
@@ -93,6 +96,7 @@ For usage examples, refer to the individual README files:
 - [OCR QA Pipeline](README_ocrqa.md)
 - [LDA Topics Pipeline](README_ldatopics.md)
 - [News Agencies Pipeline](README_newsagencies.md)
+- [Advertisement Classifier](README_adclassifier.md)
 - [Solr normalization Pipeline](README_solrnormalization.md)
 
 See also the interactive notebooks for further examples:
