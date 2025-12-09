@@ -452,7 +452,7 @@ class OCRQAPipeline:
         self,
         repo_id: Optional[str] = None,
         revision: str = "main",
-        score_precision: int = 2,
+        score_precision: int = DEFAULT_SCORE_PRECISION,
     ) -> None:
         """
         Initialize the OCR Quality Assessment pipeline.
