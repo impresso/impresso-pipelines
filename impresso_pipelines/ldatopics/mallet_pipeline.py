@@ -24,12 +24,17 @@ Example usage:
 """
 
 from impresso_pipelines.langident.langident_pipeline import LangIdentPipeline
+from impresso_pipelines.ldatopics.config import (
+    SUPPORTED_LANGUAGES,
+    TOPIC_MODEL_DESCRIPTIONS,
+    TOPIC_MODEL_DESCRIPTIONS_HF,
+)
 from impresso_pipelines.ldatopics.mallet_topic_inferencer import MalletTopicInferencer
 import argparse
 import json
 import os
 import bz2
-from typing import Dict, List, Any, Optional, Union
+from typing import Dict, List, Any, Optional, Union, Tuple
 from huggingface_hub import hf_hub_download, list_repo_files
 import tempfile
 import shutil
@@ -91,6 +96,11 @@ class LDATopicsPipeline:
         self.temp_output_file = None  # Placeholder for temporary output file
         self.latest_model = None
         self.doc_counter = 0
+        self.lang_identifier = LangIdentPipeline()
+        self.supported_languages = SUPPORTED_LANGUAGES
+        self.topic_model_descriptions = TOPIC_MODEL_DESCRIPTIONS
+        self.topic_model_descriptions_hf = TOPIC_MODEL_DESCRIPTIONS_HF
+        self._spacy_pipelines: Dict[Tuple[str, str], Any] = {}
 
         # Start JVM if not already running
         if not jpype.isJVMStarted():
@@ -150,7 +160,7 @@ class LDATopicsPipeline:
         jar_paths = []
 
         for jar_name in jar_files:
-            logging.info(f"Downloading {jar_name} from Hugging Face Hub...")
+            logger.info("Downloading %s from Hugging Face Hub...", jar_name)
             jar_path = hf_hub_download(
                 repo_id="impresso-project/mallet-topic-inferencer",
                 filename=f"mallet/lib/{jar_name}"
@@ -222,9 +232,10 @@ class LDATopicsPipeline:
         if self.language is None:
             self.language_detection(text)
 
-        from impresso_pipelines.ldatopics.config import SUPPORTED_LANGUAGES, TOPIC_MODEL_DESCRIPTIONS  # Lazy import
-        if self.language not in SUPPORTED_LANGUAGES:
-            raise ValueError(f"Unsupported language: {self.language}. Supported languages are: {SUPPORTED_LANGUAGES.keys()}")
+        if self.language not in self.supported_languages:
+            raise ValueError(
+                f"Unsupported language: {self.language}. Supported languages are: {self.supported_languages.keys()}"
+            )
 
         # Part 1.5: Find the latest model version
         self.find_latest_model_version()
@@ -243,7 +254,7 @@ class LDATopicsPipeline:
 
         # for each entry in the output list, add key "topic_model_description" with the value from the config file for the language
         for entry in output:
-            entry["topic_model_description"] = TOPIC_MODEL_DESCRIPTIONS[self.language]
+            entry["topic_model_description"] = self.topic_model_descriptions[self.language]
         
         # rename the key "lg" to "language" in the output list
         output = [self.rename_key_preserve_position(entry, 'lg', 'language') for entry in output]
@@ -312,8 +323,7 @@ class LDATopicsPipeline:
         Side effects:
             Sets self.language to the detected language code
         """
-        lang_model = LangIdentPipeline()
-        lang_result = lang_model(text)
+        lang_result = self.lang_identifier(text)
         self.language = lang_result["language"]
         return self.language
     
@@ -336,14 +346,17 @@ class LDATopicsPipeline:
         Note:
             SpaCy models are downloaded automatically if not already present.
         """
-        from impresso_pipelines.ldatopics.SPACY import SPACY  # Lazy import
-        from impresso_pipelines.ldatopics.config import SUPPORTED_LANGUAGES  # Lazy import
+        from impresso_pipelines.ldatopics.SPACY import SPACY as SpacyPipeline  # Lazy import
 
-        model_id = SUPPORTED_LANGUAGES[self.language]
+        model_id = self.supported_languages[self.language]
         if not model_id:
             raise ValueError(f"No SpaCy model available for {self.language}")
 
-        nlp = SPACY(model_id, self.language, self.latest_model)
+        cache_key = (self.language, self.latest_model)
+        nlp = self._spacy_pipelines.get(cache_key)
+        if nlp is None:
+            nlp = SpacyPipeline(model_id, self.language, self.latest_model)
+            self._spacy_pipelines[cache_key] = nlp
         return nlp(text)
 
     def vectorizer_mallet(self, text: str, output_file: str, doc_name: str) -> None:
@@ -499,15 +512,13 @@ class LDATopicsPipeline:
                 }
             }
         """
-        from impresso_pipelines.ldatopics.config import TOPIC_MODEL_DESCRIPTIONS_HF
-
          # If the pipeline returned a list of docs, recurse into each one
         if isinstance(output, list):
             return [self.add_topic_words_to_output(item) for item in output]
 
         # 1) Lookup repo_id & filename from your config
         try:
-            repo_id, hf_filename = TOPIC_MODEL_DESCRIPTIONS_HF[self.language]
+            repo_id, hf_filename = self.topic_model_descriptions_hf[self.language]
         except KeyError:
             raise ValueError(f"No HF topic‐description entry for language '{self.language}'")
 

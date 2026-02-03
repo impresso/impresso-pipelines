@@ -7,10 +7,14 @@ import tarfile
 import tempfile
 import requests
 import shutil  # Add this import for moving directories
+import logging
 from huggingface_hub import hf_hub_download
+
+logger = logging.getLogger(__name__)
 
 class SPACY:
     def __init__(self, model_id, language, latest_version):
+        self.language = language
         # load spcay file
         from impresso_pipelines.ldatopics.config import MODEL_URLS  # Lazy import
         model_url = MODEL_URLS[model_id]
@@ -52,7 +56,7 @@ class SPACY:
         try:
             spacy.load(model_id)
         except OSError:
-            print(f"Downloading SpaCy model: {model_id}...")
+            logger.info("Downloading SpaCy model: %s...", model_id)
             subprocess.run(["python", "-m", "spacy", "download", model_id], check=True)
 
     def download_and_extract_model(self, model_url):
@@ -67,10 +71,10 @@ class SPACY:
         # Check if the model is already cached
         if os.path.exists(cached_model_path):
             # print(f"Using cached SpaCy model from: {cached_model_path}")
-            print(f"Using cached SpaCy model...")
+            logger.info("Using cached SpaCy model...")
         else:
             # Download the tar file
-            print(f"Downloading SpaCy model from: {model_url}...")
+            logger.info("Downloading SpaCy model from: %s...", model_url)
             response = requests.get(model_url, stream=True)
             response.raise_for_status()
             with open(cached_model_path, "wb") as f:
@@ -107,11 +111,16 @@ class SPACY:
         # for token in doc:
         #     print(f"Token: {token.text}, POS: {token.pos_}, Tag: {token.tag_}")
         # Filter tokens based on POS tags from config and lemmatize using the dictionary
-        lemmatized_text = [
-            self.lemmatization_dict.get(token.text.lower(), token.lemma_.lower())
-            for token in doc
-            if (token.pos_ or self.map_tag_to_pos(token.tag_)) in self.upos_filter
-        ]
+        lemmatized_text = []
+        for token in doc:
+            if self.language == "lb":
+                pos_tag = token.pos_ or self.map_tag_to_pos(token.tag_)
+            else:
+                pos_tag = token.pos_
+            if pos_tag in self.upos_filter:
+                lemmatized_text.append(
+                    self.lemmatization_dict.get(token.text.lower(), token.lemma_.lower())
+                )
 
         # print("French lemmatized tokens:", lemmatized_text)
 
