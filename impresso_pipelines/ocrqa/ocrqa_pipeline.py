@@ -46,7 +46,7 @@ import re
 import unicodedata
 from typing import Dict, List, Literal, Optional, Set, Union
 
-from huggingface_hub import hf_hub_download, list_repo_files
+from huggingface_hub import hf_hub_download, list_repo_files, scan_cache_dir
 from pybloomfilter import BloomFilter
 
 from impresso_pipelines.langident.langident_pipeline import LangIdentPipeline
@@ -378,7 +378,7 @@ def subtokens(
 
 
 def get_bloomfilter(
-    model_id: str, filename: str, revision: str = "main"
+    model_id: str, filename: str, revision: str = "main", local_files_only: bool = False
 ) -> BloomFilter:
     """
     Download and load a BloomFilter from the Hugging Face Hub.
@@ -389,6 +389,7 @@ def get_bloomfilter(
         model_id: The Hugging Face repository ID (e.g., "impresso-project/OCR-quality-assessment-unigram")
         filename: The BloomFilter filename to download (e.g., "ocrqa-wp_v2.0.0-en.bloom")
         revision: The repository revision - branch, tag, or commit hash (default: "main")
+        local_files_only: If True, only use cached files without network access (default: False)
 
     Returns:
         Loaded BloomFilter instance ready for membership testing
@@ -405,7 +406,12 @@ def get_bloomfilter(
         True
     """
     return BloomFilter.open(
-        hf_hub_download(repo_id=model_id, filename=filename, revision=revision)
+        hf_hub_download(
+            repo_id=model_id,
+            filename=filename,
+            revision=revision,
+            local_files_only=local_files_only,
+        )
     )
 
 
@@ -455,6 +461,7 @@ class OCRQAPipeline:
         repo_id: Optional[str] = None,
         revision: str = "main",
         score_precision: int = DEFAULT_SCORE_PRECISION,
+        local_files_only: bool = False,
     ) -> None:
         """
         Initialize the OCR Quality Assessment pipeline.
@@ -467,6 +474,7 @@ class OCRQAPipeline:
                     ("impresso-project/OCR-quality-assessment-unigram")
             revision: Repository revision - branch, tag, or commit hash (default: "main")
             score_precision: Number of decimal places for score rounding (default: 2)
+            local_files_only: If True, only use cached files without network access (default: False)
 
         Raises:
             Exception: If repository access or language detection initialization fails
@@ -474,13 +482,65 @@ class OCRQAPipeline:
         self.repo_id: str = repo_id or self.DEFAULT_REPO_ID
         self.revision: str = revision
         self.score_precision: int = score_precision
+        self.local_files_only: bool = local_files_only
 
-        self.repo_files: List[str] = list_repo_files(
-            self.repo_id, revision=self.revision
-        )
+        # Retrieve repository files - either from Hub or local cache
+        if local_files_only:
+            self.repo_files: List[str] = self._scan_local_cache()
+            logger.info(f"Offline mode: discovered {len(self.repo_files)} cached files")
+        else:
+            self.repo_files = list_repo_files(self.repo_id, revision=self.revision)
+
         self.SUPPORTED_LANGUAGES: Set[str] = self._get_supported_languages()
-        self.lang_model: LangIdentPipeline = LangIdentPipeline()
+        self.lang_model: LangIdentPipeline = LangIdentPipeline(
+            local_files_only=local_files_only
+        )
         self.bloomfilters: Dict[str, BloomFilter] = {}
+
+    def _scan_local_cache(self) -> List[str]:
+        """
+        Scan the local Hugging Face cache for available files.
+
+        Discovers cached files for the configured repository and revision,
+        enabling offline operation when the cache is already populated.
+
+        Returns:
+            List of filenames available in the local cache
+
+        Note:
+            Returns an empty list if the repository/revision is not found in cache.
+            This allows graceful degradation - if specific files are requested,
+            they can still be resolved if present in cache.
+        """
+        try:
+            cache_info = scan_cache_dir()
+            for repo in cache_info.repos:
+                if repo.repo_id == self.repo_id:
+                    # Find matching revision
+                    for rev_info in repo.revisions:
+                        # Match by commit hash or by refs (branches/tags)
+                        if (
+                            rev_info.commit_hash == self.revision
+                            or self.revision in getattr(rev_info, "refs", [])
+                        ):
+                            # Extract filenames from cached files
+                            files = [f.file_name for f in rev_info.files]
+                            logger.debug(
+                                f"Found {len(files)} files in cache for"
+                                f" {self.repo_id}@{self.revision}"
+                            )
+                            return files
+            logger.warning(
+                f"No cached files found for {self.repo_id}@{self.revision}. "
+                "Pipeline will attempt to resolve files on-demand from cache."
+            )
+            return []
+        except Exception as e:
+            logger.warning(
+                f"Failed to scan cache: {e}. "
+                "Pipeline will attempt to resolve files on-demand from cache."
+            )
+            return []
 
     def _is_bloomfilter_file(self, filename: str) -> bool:
         """
@@ -722,7 +782,10 @@ class OCRQAPipeline:
                         selected_version, detected_language
                     )
                     self.bloomfilters[bloomfilter_key] = get_bloomfilter(
-                        self.repo_id, bloomfilter_filename, self.revision
+                        self.repo_id,
+                        bloomfilter_filename,
+                        self.revision,
+                        local_files_only=self.local_files_only,
                     )
                 except Exception as e:
                     raise Exception(
