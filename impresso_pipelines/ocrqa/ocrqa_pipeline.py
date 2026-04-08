@@ -44,7 +44,7 @@ For detailed normalization behavior, see the normalize_text() and subtokens() fu
 import logging
 import re
 import unicodedata
-from typing import Dict, List, Optional, Set, Union
+from typing import Dict, List, Literal, Optional, Set, Union
 
 from huggingface_hub import hf_hub_download, list_repo_files
 from pybloomfilter import BloomFilter
@@ -52,6 +52,9 @@ from pybloomfilter import BloomFilter
 from impresso_pipelines.langident.langident_pipeline import LangIdentPipeline
 
 logger = logging.getLogger(__name__)
+
+# Type alias for JSON-like data structures
+Json = Union[str, int, float, bool, None, Dict[str, "Json"], List["Json"]]
 
 
 # ===== Normalization Tables for Different BloomFilter Versions =====
@@ -183,7 +186,7 @@ def normalize_text(
     s: str,
     version: str,
     language: Optional[str] = None,
-    unicode_normalize: Optional[str] = "NFKC",
+    unicode_normalize: Literal["NFC", "NFD", "NFKC", "NFKD"] = "NFC",
 ) -> str:
     """
     Normalize text using version-specific rules for BloomFilter comparison.
@@ -219,8 +222,7 @@ def normalize_text(
     major_version: int = _extract_major_version(version)
 
     # Apply Unicode normalization first
-    if unicode_normalize:
-        s = unicodedata.normalize(unicode_normalize, s)
+    s = unicodedata.normalize(unicode_normalize, s)
 
     if major_version >= 2:
         # V2: Simplified approach with single translation table
@@ -250,7 +252,7 @@ def subtokens(
     text: str,
     version: str,
     language: Optional[str] = None,
-    unicode_normalize: Optional[str] = "NFKC",
+    unicode_normalize: Literal["NFC", "NFD", "NFKC", "NFKD"] = "NFC",
     min_length: int = 1,
     lowercase: bool = True,
 ) -> List[str]:
@@ -639,7 +641,7 @@ class OCRQAPipeline:
         diagnostics: bool = False,
         model_id: bool = False,
         supported_languages: bool = False,
-    ) -> Dict[str, Union[str, float, List[str], Dict]]:
+    ) -> Dict[str, Json]:
         """
         Assess OCR quality of input text using BloomFilter lexicon matching.
 
@@ -730,12 +732,14 @@ class OCRQAPipeline:
 
             bf: BloomFilter = self.bloomfilters[bloomfilter_key]
 
-            output: Dict[str, Union[str, float, List[str]]] = self.filter_text(
+            output: Dict[str, Json] = self.filter_text(
                 text, bf, detected_language, selected_version, diagnostics, model_id
             )
 
             if supported_languages:
-                output["supported_languages"] = sorted(self.SUPPORTED_LANGUAGES)
+                output["supported_languages"] = sorted(  # type: ignore[assignment]
+                    self.SUPPORTED_LANGUAGES
+                )
 
             return output
 
@@ -752,7 +756,7 @@ class OCRQAPipeline:
         version: str,
         include_diagnostics: bool,
         include_model_id: bool,
-    ) -> Dict[str, Union[str, float, List[str], Dict[str, Union[List[str], str]]]]:
+    ) -> Dict[str, Json]:
         """
         Filter text tokens through BloomFilter and compute quality score.
 
@@ -796,13 +800,13 @@ class OCRQAPipeline:
         )
         score = round(score, self.score_precision)
 
-        output: Dict[str, Union[str, float, Dict[str, Union[List[str], str]]]] = {
+        output: Dict[str, Json] = {
             "language": language,
             "score": score,
         }
 
         if include_diagnostics:
-            output["diagnostics"] = {
+            output["diagnostics"] = {  # type: ignore[assignment]
                 "known_tokens": sorted(knowns),
                 "unknown_tokens": sorted(unknowns),
                 "model_id": f"ocrqa-wp_v{version}-{language}",
