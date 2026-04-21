@@ -49,7 +49,8 @@ print(result)
 OCRQAPipeline(
     repo_id: Optional[str] = None,        # HuggingFace repo (default: "impresso-project/OCR-quality-assessment-unigram")
     revision: str = "main",                # Repository revision/branch/tag
-    score_precision: int = 2               # Number of decimal places for score (default: 2)
+    score_precision: int = 2,              # Number of decimal places for score (default: 2)
+    local_files_only: bool = False         # Use only cached files (offline mode)
 )
 ```
 
@@ -67,7 +68,40 @@ pipeline = OCRQAPipeline(
 
 # Customize score precision
 pipeline = OCRQAPipeline(score_precision=3)  # 3 decimal places
+
+# Offline mode - use only cached files (no network access)
+pipeline = OCRQAPipeline(local_files_only=True)
 ```
+
+### Offline / Cache-First Mode
+
+For production environments, HPC clusters, or situations where you want to avoid network dependencies, you can use `local_files_only=True`:
+
+```python
+# Initialize in offline mode
+pipeline = OCRQAPipeline(local_files_only=True)
+
+# The pipeline will:
+# 1. Scan the local HuggingFace cache for available files
+# 2. Use only cached models and BloomFilters
+# 3. Not make any network requests to HuggingFace Hub
+# 4. Fail cleanly if required files are not cached
+
+result = pipeline("Text to assess", language="en")
+```
+
+**Benefits:**
+
+- **Reliable parallel execution**: Many workers can initialize simultaneously without Hub rate limits
+- **Offline operation**: Works in environments with restricted network access
+- **Deterministic behavior**: Uses specific cached versions without checking for updates
+- **Faster initialization**: No network latency from repository listing calls
+
+**Requirements:**
+
+- Cache must be pre-populated (run once with `local_files_only=False` to download models)
+- For auto-detection of languages/versions, relevant files must be cached
+- Alternatively, specify explicit `language` and `version` parameters when calling the pipeline
 
 ### Processing Parameters
 
