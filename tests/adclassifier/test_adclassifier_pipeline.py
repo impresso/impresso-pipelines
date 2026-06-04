@@ -4,6 +4,7 @@ Tests for the Advertisement Classifier.
 
 import pytest
 from impresso_pipelines.adclassifier import AdClassifierPipeline
+import impresso_pipelines.adclassifier.adclassifier_pipeline as ad_module
 
 
 @pytest.fixture
@@ -178,9 +179,53 @@ def test_custom_parameters():
     pipeline = AdClassifierPipeline(
         batch_size=8,
         ad_threshold=0.5,
-        temperature=1.0
+        temperature=1.0,
+        revision="main",
     )
     
     assert pipeline.batch_size == 8
     assert pipeline.ad_threshold == 0.5
     assert pipeline.temperature == 1.0
+    assert pipeline.revision == "main"
+
+
+def test_default_revision_is_used_for_model_loading(monkeypatch):
+    """Test that the default HuggingFace revision is passed to model loaders."""
+    calls = []
+
+    class DummyTokenizer:
+        pass
+
+    class DummyModel:
+        config = type("Config", (), {"id2label": {0: "Promotion", 1: "News"}})()
+
+        def to(self, device):
+            return self
+
+        def eval(self):
+            return self
+
+    def fake_tokenizer_from_pretrained(model_name, **kwargs):
+        calls.append(("tokenizer", model_name, kwargs))
+        return DummyTokenizer()
+
+    def fake_model_from_pretrained(model_name, **kwargs):
+        calls.append(("model", model_name, kwargs))
+        return DummyModel()
+
+    monkeypatch.setattr(
+        ad_module.AutoTokenizer, "from_pretrained", fake_tokenizer_from_pretrained
+    )
+    monkeypatch.setattr(
+        ad_module.AutoModelForSequenceClassification,
+        "from_pretrained",
+        fake_model_from_pretrained,
+    )
+
+    pipeline = ad_module.AdClassifierPipeline(device="cpu")
+
+    assert pipeline.revision == "v2.0"
+    assert len(calls) == 2
+    for _, _, kwargs in calls:
+        assert kwargs["revision"] == "v2.0"
+        assert kwargs["trust_remote_code"] is True

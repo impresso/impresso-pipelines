@@ -148,11 +148,12 @@ class AdClassifierPipeline:
         max_length: int = 512,
         chunk_words: int = 0,
         pool: str = "logits_max",
-        ad_threshold: float = 0.9991338849067688,
-        lang_thresholds: str = "other:0.9991,fr:0.0755",
+        ad_threshold: float = 0.961243212223053,
+        lang_thresholds: str = "other:0.9570,fr:0.8124",
         short_len: int = 30,
         short_bonus: float = 0.2,
         temperature: float = 0.8,
+        revision: str = "v2.0",
         device: Optional[str] = None,
         diagnostics: bool = False,
     ):
@@ -170,6 +171,7 @@ class AdClassifierPipeline:
             short_len: Word count considered 'short'
             short_bonus: Threshold reduction for short texts
             temperature: Calibration temperature
+            revision: HuggingFace repository revision (branch, tag, or commit)
             device: Device to use ('cuda', 'mps', 'cpu', or None for auto)
         """
         self.batch_size = batch_size
@@ -180,6 +182,7 @@ class AdClassifierPipeline:
         self.short_len = short_len
         self.short_bonus = short_bonus
         self.temperature = temperature
+        self.revision = revision
         self.lang_thr_map = parse_lang_thresholds(lang_thresholds) if lang_thresholds else {}
         self.diagnostics = diagnostics
         # Auto-detect device
@@ -192,9 +195,11 @@ class AdClassifierPipeline:
                 device = "cpu"
         self.device = device
         # Load model and tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            model_name, trust_remote_code=True, revision=self.revision
+        )
         self.model = AutoModelForSequenceClassification.from_pretrained(
-            model_name, trust_remote_code=True
+            model_name, trust_remote_code=True, revision=self.revision
         )
         self.model.to(self.device).eval()
         self.id2label = self.model.config.id2label

@@ -104,6 +104,7 @@ pipeline = AdClassifierPipeline(
     short_len=30,               # Word count considered 'short'
     short_bonus=0.2,            # Threshold reduction for short texts
     temperature=0.8,            # Calibration temperature
+    revision="v2.0",            # HuggingFace model revision/tag
     device=None                 # 'cuda', 'mps', 'cpu', or None for auto-detect
 )
 ```
@@ -126,6 +127,7 @@ pipeline = AdClassifierPipeline(device="cpu")   # Force CPU
 
 The pipeline uses the fine-tuned model from HuggingFace:
 - **Model**: `impresso-project/impresso-ad-classification-xlm-one-class`
+- **Revision**: `v2.0`
 - **Base**: XLM-RoBERTa
 - **Task**: Multi-genre text classification with ad detection
 - **Languages**: Multilingual (optimized for French, German, Luxembourgish)
