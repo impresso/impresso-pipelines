@@ -67,3 +67,8 @@ Thumbs.db
 # Documentation builds
 docs/_build/
 site/
+
+
+
+
+old/
