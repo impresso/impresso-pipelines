@@ -84,8 +84,8 @@ LANG_CONFIGS = {
         "stopwords_file": "stopwords_en.txt",
         "analyzer_pipeline": [
             {"type": "tokenizer", "name": "standard"},
-            {"type": "tokenfilter", "name": "stop"},
             {"type": "tokenfilter", "name": "lowercase"},
+            {"type": "tokenfilter", "name": "stop"},
             {"type": "tokenfilter", "name": "englishPossessive"},
             {"type": "tokenfilter", "name": "englishMinimalStem"},
             {"type": "tokenfilter", "name": "asciifolding"}
