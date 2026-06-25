@@ -49,6 +49,9 @@ logger = logging.getLogger(__name__)
 
 HF_REPO_ID = "impresso-project/mallet-topic-inferencer"
 DEFAULT_TOPIC_MODEL_VERSION = "3.0"
+MALLET_RUNTIME_V3 = "mallet-2.1.0"
+MALLET_RUNTIME_LEGACY = "mallet-legacy"
+_ACTIVE_MALLET_RUNTIME: Optional[str] = None
 LEGACY_TOPIC_MODEL_VERSIONS = {
     "de": "2.0",
     "fr": "2.0",
@@ -123,6 +126,7 @@ class LDATopicsPipeline:
         self.temp_output_file = None  # Placeholder for temporary output file
         self.latest_model = None
         self.topic_model_version = topic_model_version
+        self.mallet_runtime = self.mallet_runtime_for_version()
         self.model_id = None
         self.model_config: Dict[str, Any] = {}
         self.doc_counter = 0
@@ -160,7 +164,9 @@ class LDATopicsPipeline:
                     raise RuntimeError(f"Could not find JVM. Please install Java and/or set JAVA_HOME environment variable. Error: {e}")
             
             jpype.startJVM(jvm_path, f"-Djava.class.path={classpath}")
+            self.remember_active_mallet_runtime()
         else:
+            self.ensure_mallet_runtime_compatible()
             # JVM already started, check if Mallet classes are available
             try:
                 from cc.mallet.classify.tui import Csv2Vectors
@@ -183,7 +189,7 @@ class LDATopicsPipeline:
         Note:
             Files are cached by Hugging Face Hub, so subsequent calls won't re-download.
         """
-        if self.uses_v3_runtime():
+        if self.mallet_runtime == MALLET_RUNTIME_V3:
             jar_files = [
                 "mallet-2.1.0/lib/mallet-2.1.0.jar",
                 "mallet-2.1.0/lib/hppc-0.8.1.jar",
@@ -210,11 +216,51 @@ class LDATopicsPipeline:
         requested = str(self.topic_model_version).lower().lstrip("v")
         return requested.startswith("3")
 
+    def mallet_runtime_for_version(self) -> str:
+        return MALLET_RUNTIME_V3 if self.uses_v3_runtime() else MALLET_RUNTIME_LEGACY
+
+    def active_mallet_runtime(self) -> Optional[str]:
+        global _ACTIVE_MALLET_RUNTIME
+        if _ACTIVE_MALLET_RUNTIME:
+            return _ACTIVE_MALLET_RUNTIME
+
+        if not jpype.isJVMStarted():
+            return None
+
+        try:
+            java_system = jpype.JClass("java.lang.System")
+            classpath = str(java_system.getProperty("java.class.path"))
+        except Exception:
+            return None
+
+        if "mallet-2.1.0.jar" in classpath:
+            _ACTIVE_MALLET_RUNTIME = MALLET_RUNTIME_V3
+        elif "mallet.jar" in classpath or "mallet-deps.jar" in classpath:
+            _ACTIVE_MALLET_RUNTIME = MALLET_RUNTIME_LEGACY
+        return _ACTIVE_MALLET_RUNTIME
+
+    def remember_active_mallet_runtime(self) -> None:
+        global _ACTIVE_MALLET_RUNTIME
+        _ACTIVE_MALLET_RUNTIME = self.mallet_runtime
+
+    def ensure_mallet_runtime_compatible(self) -> None:
+        active_runtime = self.active_mallet_runtime()
+        if active_runtime is None or active_runtime == self.mallet_runtime:
+            return
+
+        raise RuntimeError(
+            "LDATopicsPipeline cannot switch MALLET runtimes after the JVM has "
+            f"started. Requested topic_model_version={self.topic_model_version!r} "
+            f"needs {self.mallet_runtime}, but the active JVM uses "
+            f"{active_runtime}. Restart the Python/Colab runtime before switching "
+            "between v2 and v3 topic models."
+        )
+
     def should_rewrite_pipe(self) -> bool:
         mallet_config = self.model_config.get("mallet", {})
         return not (
             isinstance(mallet_config, dict)
-            and mallet_config.get("runtime") == "mallet-2.1.0"
+            and mallet_config.get("runtime") == MALLET_RUNTIME_V3
         )
 
 
