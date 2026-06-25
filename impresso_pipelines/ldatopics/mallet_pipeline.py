@@ -26,8 +26,6 @@ Example usage:
 from impresso_pipelines.langident.langident_pipeline import LangIdentPipeline
 from impresso_pipelines.ldatopics.config import (
     SUPPORTED_LANGUAGES,
-    TOPIC_MODEL_DESCRIPTIONS,
-    TOPIC_MODEL_DESCRIPTIONS_HF,
 )
 from impresso_pipelines.ldatopics.mallet_topic_inferencer import MalletTopicInferencer
 import argparse
@@ -35,7 +33,7 @@ import json
 import os
 import bz2
 from typing import Dict, List, Any, Optional, Union, Tuple
-from huggingface_hub import hf_hub_download, list_repo_files
+from huggingface_hub import hf_hub_download
 import tempfile
 import shutil
 import subprocess
@@ -48,6 +46,31 @@ except ImportError:
     import jpype
 
 logger = logging.getLogger(__name__)
+
+HF_REPO_ID = "impresso-project/mallet-topic-inferencer"
+DEFAULT_TOPIC_MODEL_VERSION = "3.0"
+LEGACY_TOPIC_MODEL_VERSIONS = {
+    "de": "2.0",
+    "fr": "2.0",
+    "lb": "2.1",
+}
+LEGACY_MODEL_CONFIGS = {
+    "de": {
+        "uposFilter": ["NOUN", "PROPN"],
+        "topic_count": 100,
+        "lowercase_token": False,
+    },
+    "fr": {
+        "uposFilter": ["NOUN", "PROPN"],
+        "topic_count": 100,
+        "lowercase_token": False,
+    },
+    "lb": {
+        "uposFilter": ["NOUN"],
+        "topic_count": 100,
+        "lowercase_token": True,
+    },
+}
 
 
 class LDATopicsPipeline:
@@ -81,12 +104,16 @@ class LDATopicsPipeline:
         >>> print(f"Topics: {len(result['topics'])}")
     """
 
-    def __init__(self) -> None:
+    def __init__(self, topic_model_version: str = DEFAULT_TOPIC_MODEL_VERSION) -> None:
         """
         Initialize the LDA topics pipeline.
         
         Sets up temporary directories, downloads Mallet JAR files from Hugging Face,
         and initializes the Java Virtual Machine (JVM) with Mallet's classpath.
+
+        Args:
+            topic_model_version: Topic model version family to use. Defaults to "3.0".
+                Use "2" for the legacy v2 models currently used in production.
         
         Raises:
             RuntimeError: If JVM cannot be started or Mallet classes are unavailable
@@ -95,18 +122,18 @@ class LDATopicsPipeline:
         self.temp_dir = tempfile.mkdtemp(prefix="mallet_models_")  # Create temp folder for models
         self.temp_output_file = None  # Placeholder for temporary output file
         self.latest_model = None
+        self.topic_model_version = topic_model_version
+        self.model_id = None
+        self.model_config: Dict[str, Any] = {}
         self.doc_counter = 0
         self.lang_identifier = LangIdentPipeline()
         self.supported_languages = SUPPORTED_LANGUAGES
-        self.topic_model_descriptions = TOPIC_MODEL_DESCRIPTIONS
-        self.topic_model_descriptions_hf = TOPIC_MODEL_DESCRIPTIONS_HF
         self._spacy_pipelines: Dict[Tuple[str, str], Any] = {}
 
         # Start JVM if not already running
         if not jpype.isJVMStarted():
             mallet_dir = self.setup_mallet_jars()  # Use Hugging Face caching
-            # need to add mallet/lib since thats how it saves from hf_hub_download
-            classpath = f"{mallet_dir}/mallet.jar:{mallet_dir}/mallet-deps.jar"
+            classpath = os.pathsep.join(mallet_dir)
             # Start JVM with Mallet's classpath
             # Try to get JVM path, with fallback to JAVA_HOME if default fails
             try:
@@ -143,32 +170,52 @@ class LDATopicsPipeline:
                 raise RuntimeError("JVM started without Mallet jars. Please ensure no other code starts the JVM before LDATopicsPipeline.") from e
 
     
-    def setup_mallet_jars(self) -> str:
+    def setup_mallet_jars(self) -> List[str]:
         """
         Download Mallet JAR files from Hugging Face Hub.
         
-        Downloads mallet.jar and mallet-deps.jar from the impresso-project repository
+        Downloads the Mallet runtime jars from the impresso-project repository
         and caches them locally using Hugging Face's download mechanism.
 
         Returns:
-            Path to the directory containing the downloaded Mallet JAR files.
+            Paths to the downloaded Mallet JAR files.
             
         Note:
             Files are cached by Hugging Face Hub, so subsequent calls won't re-download.
         """
-        jar_files = ["mallet.jar", "mallet-deps.jar"]
+        if self.uses_v3_runtime():
+            jar_files = [
+                "mallet-2.1.0/lib/mallet-2.1.0.jar",
+                "mallet-2.1.0/lib/hppc-0.8.1.jar",
+                "mallet-2.1.0/lib/error_prone_annotations-2.24.1.jar",
+            ]
+        else:
+            jar_files = [
+                "mallet/lib/mallet.jar",
+                "mallet/lib/mallet-deps.jar",
+            ]
         jar_paths = []
 
-        for jar_name in jar_files:
-            logger.info("Downloading %s from Hugging Face Hub...", jar_name)
+        for jar_filename in jar_files:
+            logger.info("Downloading %s from Hugging Face Hub...", jar_filename)
             jar_path = hf_hub_download(
-                repo_id="impresso-project/mallet-topic-inferencer",
-                filename=f"mallet/lib/{jar_name}"
+                repo_id=HF_REPO_ID,
+                filename=jar_filename,
             )
             jar_paths.append(jar_path)
 
-        # Return the directory containing the first JAR file (all files are in the same directory)
-        return os.path.dirname(jar_paths[0])
+        return jar_paths
+
+    def uses_v3_runtime(self) -> bool:
+        requested = str(self.topic_model_version).lower().lstrip("v")
+        return requested.startswith("3")
+
+    def should_rewrite_pipe(self) -> bool:
+        mallet_config = self.model_config.get("mallet", {})
+        return not (
+            isinstance(mallet_config, dict)
+            and mallet_config.get("runtime") == "mallet-2.1.0"
+        )
 
 
     def __call__(
@@ -237,8 +284,8 @@ class LDATopicsPipeline:
                 f"Unsupported language: {self.language}. Supported languages are: {self.supported_languages.keys()}"
             )
 
-        # Part 1.5: Find the latest model version
-        self.find_latest_model_version()
+        # Part 1.5: Resolve the selected model version for this language
+        self.resolve_model_version()
 
         # PART 2: Lemmatization using SpaCy
         lemma_text = self.SPACY(text)
@@ -252,9 +299,9 @@ class LDATopicsPipeline:
         # PART 5: Return the JSON output
         output = self.json_output(filepath=os.path.join(self.temp_dir, "tmp_output.jsonl"))
 
-        # for each entry in the output list, add key "topic_model_description" with the value from the config file for the language
+        # for each entry in the output list, add key "topic_model_description"
         for entry in output:
-            entry["topic_model_description"] = self.topic_model_descriptions[self.language]
+            entry["topic_model_description"] = self.topic_model_description_url()
         
         # rename the key "lg" to "language" in the output list
         output = [self.rename_key_preserve_position(entry, 'lg', 'language') for entry in output]
@@ -285,30 +332,87 @@ class LDATopicsPipeline:
             self.doc_counter += 1  # Increment the document counter for the next call
         return output[0]  # Returns clean lemmatized text without punctuation
     
-    def find_latest_model_version(self) -> None:
+    def resolve_model_version(self) -> None:
         """
-        Find and set the latest topic model version for the current language.
-        
-        Queries Hugging Face Hub for available model versions and selects the
-        most recent one based on version numbering in filenames.
+        Resolve and load the topic model config for the current language.
 
-        Raises:
-            ValueError: If no model version is found for the specified language
-            
         Side effects:
-            Sets self.latest_model to the version string (e.g., "2.1.0")
+            Sets self.latest_model, self.model_id, and self.model_config.
         """
-        repo_id = "impresso-project/mallet-topic-inferencer"
-        files = list_repo_files(repo_id)
-        versions = [f for f in files if f.startswith(f"models/tm/tm-{self.language}-all") and f.endswith(".pipe")] # check version of pipe 
-        
-        # Extract version numbers and find the latest one
-        versions.sort(reverse=True)
-        # extract the version number from the filename and set self.latest_model to the latest version
-        if versions:
-            self.latest_model = versions[0].split('-v')[-1].replace('.pipe', '')
+        requested = str(self.topic_model_version).lower().lstrip("v")
+        if requested == "2":
+            version = LEGACY_TOPIC_MODEL_VERSIONS[self.language]
+        elif requested == "3":
+            version = "3.0"
         else:
-            raise ValueError(f"Could not get latest version for language: {self.language}")
+            version = requested
+
+        self.latest_model = version
+        self.model_id = f"tm-{self.language}-all-v{version}"
+        self.model_config = self.load_topic_model_config()
+
+    def load_topic_model_config(self) -> Dict[str, Any]:
+        config_filename = f"models/tm/{self.model_id}.config.json"
+        try:
+            config_path = hf_hub_download(repo_id=HF_REPO_ID, filename=config_filename)
+        except Exception:
+            if self.latest_model == LEGACY_TOPIC_MODEL_VERSIONS.get(self.language):
+                return self.legacy_model_config()
+            raise
+
+        with open(config_path, "r", encoding="utf-8") as f:
+            return self.normalize_topic_model_config(json.load(f))
+
+    def legacy_model_config(self) -> Dict[str, Any]:
+        config = LEGACY_MODEL_CONFIGS[self.language].copy()
+        config.update(
+            {
+                "language": self.language,
+                "model_id": self.model_id,
+                "preprocessing_mode": "v2.0-legacy",
+            }
+        )
+        return self.normalize_topic_model_config(config)
+
+    def normalize_topic_model_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        preprocessing = config.get("preprocessing", {})
+        if not isinstance(preprocessing, dict):
+            preprocessing = {}
+        return {
+            **config,
+            "language": config.get("language", self.language),
+            "model_id": config.get("model_id", self.model_id),
+            "topic_count": int(config.get("topic_count", 100)),
+            "preprocessing_mode": preprocessing.get(
+                "mode", config.get("preprocessing_mode", "v2.0-legacy")
+            ),
+            "upos_filter": preprocessing.get(
+                "upos_filter",
+                config.get("upos_filter", config.get("uposFilter", [])),
+            ),
+            "lowercase_token": bool(
+                preprocessing.get(
+                    "lowercase_token", config.get("lowercase_token", False)
+                )
+            ),
+            "min_lemma_length": int(
+                preprocessing.get("min_lemma_length", config.get("min_lemma_length", 3))
+            ),
+            "mallet": config.get("mallet", {}),
+        }
+
+    def topic_model_description_filename(self) -> str:
+        artifacts = self.model_config.get("artifacts", {})
+        if isinstance(artifacts, dict) and artifacts.get("topic_description"):
+            filename = artifacts["topic_description"]
+            return filename if "/" in filename else f"models/tm/{filename}"
+        return f"models/tm/{self.model_id}.topic_model_topic_description.jsonl.bz2"
+
+    def topic_model_description_url(self) -> str:
+        return (
+            f"https://huggingface.co/{HF_REPO_ID}/resolve/main/"
+            f"{self.topic_model_description_filename()}"
+        )
 
     def language_detection(self, text: str) -> str:
         """
@@ -352,10 +456,15 @@ class LDATopicsPipeline:
         if not model_id:
             raise ValueError(f"No SpaCy model available for {self.language}")
 
-        cache_key = (self.language, self.latest_model)
+        cache_key = (self.language, self.model_id)
         nlp = self._spacy_pipelines.get(cache_key)
         if nlp is None:
-            nlp = SpacyPipeline(model_id, self.language, self.latest_model)
+            nlp = SpacyPipeline(
+                model_id,
+                self.language,
+                self.latest_model,
+                model_config=self.model_config,
+            )
             self._spacy_pipelines[cache_key] = nlp
         return nlp(text)
 
@@ -379,13 +488,17 @@ class LDATopicsPipeline:
 
         # Load the Mallet pipeline
         pipe_file = hf_hub_download(
-            repo_id="impresso-project/mallet-topic-inferencer",
-            filename=f"models/tm/tm-{self.language}-all-v{self.latest_model}.pipe"
+            repo_id=HF_REPO_ID,
+            filename=f"models/tm/{self.model_id}.pipe"
         )
 
 
         
-        mallet = MalletVectorizer(pipe_file, output_file)
+        mallet = MalletVectorizer(
+            pipe_file,
+            output_file,
+            rewrite_pipe=self.should_rewrite_pipe(),
+        )
         if doc_name is not None:
             mallet(text, doc_name)
         else:
@@ -409,13 +522,13 @@ class LDATopicsPipeline:
 
 
         inferencer_pipe = hf_hub_download(
-            repo_id="impresso-project/mallet-topic-inferencer",
-            filename=f"models/tm/tm-{lang}-all-v{self.latest_model}.pipe"
+            repo_id=HF_REPO_ID,
+            filename=f"models/tm/{self.model_id}.pipe"
         )
         
         inferencer_file = hf_hub_download(  
-            repo_id="impresso-project/mallet-topic-inferencer",
-            filename=f"models/tm/tm-{lang}-all-v{self.latest_model}.inferencer"
+            repo_id=HF_REPO_ID,
+            filename=f"models/tm/{self.model_id}.inferencer"
         )
       
 
@@ -429,8 +542,8 @@ class LDATopicsPipeline:
             **{
                 f"{lang}_inferencer": inferencer_file,
                 f"{lang}_pipe": inferencer_pipe,
-                f"{lang}_model_id": f"tm-{lang}-all-v{self.latest_model}",
-                f"{lang}_topic_count": 20
+                f"{lang}_model_id": self.model_id,
+                f"{lang}_topic_count": self.model_config.get("topic_count", 100),
             },
             min_p=self.min_p,
             keep_tmp_files=False,
@@ -516,23 +629,20 @@ class LDATopicsPipeline:
         if isinstance(output, list):
             return [self.add_topic_words_to_output(item) for item in output]
 
-        # 1) Lookup repo_id & filename from your config
-        try:
-            repo_id, hf_filename = self.topic_model_descriptions_hf[self.language]
-        except KeyError:
-            raise ValueError(f"No HF topic‐description entry for language '{self.language}'")
+        # 1) Download the compressed .jsonl.bz2 from HF
+        compressed = hf_hub_download(
+            repo_id=HF_REPO_ID,
+            filename=self.topic_model_description_filename(),
+        )
 
-        # 2) Download the compressed .jsonl.bz2 from HF
-        compressed = hf_hub_download(repo_id=repo_id, filename=hf_filename)
-
-        # 3) Unpack into a temp folder
+        # 2) Unpack into a temp folder
         temp_dir = tempfile.mkdtemp(prefix="topic_desc_")
         try:
             jsonl_path = os.path.join(temp_dir, "topic_model_descriptions.jsonl")
             with bz2.open(compressed, "rb") as f_in, open(jsonl_path, "wb") as f_out:
                 shutil.copyfileobj(f_in, f_out)
 
-            # 4) Build a map: full_topic_id → top-10 words
+            # 3) Build a map: full_topic_id → top-10 words
             topic_to_words = {}
             with open(jsonl_path, "r", encoding="utf-8") as fin:
                 for line in fin:
@@ -547,7 +657,7 @@ class LDATopicsPipeline:
                     ]
                     topic_to_words[full_id] = top10
 
-            # 5) Stitch into output
+            # 4) Stitch into output
             diagnostics = {}
             for t in output.get("topics", []):
                 key = t.get("t") or t.get("topic_model")
