@@ -58,8 +58,10 @@ Make sure you have installed the package as demostrated in the main [README](REA
 
 ```python
 from impresso_pipelines.ldatopics import LDATopicsPipeline
-# Initialize the pipeline
+# Initialize the pipeline. Defaults to topic model version 3.
 ldatopics_pipeline = LDATopicsPipeline()
+# To use the legacy v2 models:
+# ldatopics_pipeline = LDATopicsPipeline(topic_model_version="2")
 
 # Example text in German
 de_text = """Vieles Seltsame geschieht auf Erden :
@@ -88,12 +90,12 @@ print(result)
  'topic_count': 100,
  'topics': 
       [
-        {'uid': 'tm-de-all-v2.0_tp30_de', 'relevance': 0.652},
-        {'uid': 'tm-de-all-v2.0_tp65_de', 'relevance': 0.041}
+        {'uid': 'tm-de-all-v3.0_tp30_de', 'relevance': 0.652},
+        {'uid': 'tm-de-all-v3.0_tp65_de', 'relevance': 0.041}
       ],
  'min_relevance': 0.02,
- 'topic_model_id': 'tm-de-all-v2.0',
- 'topic_model_description': 'https://huggingface.co/impresso-project/mallet-topic-inferencer/resolve/main/models/tm/tm-de-all-v2.0.topic_model_topic_description.jsonl.bz2'}
+ 'topic_model_id': 'tm-de-all-v3.0',
+ 'topic_model_description': 'https://huggingface.co/impresso-project/mallet-topic-inferencer/resolve/main/models/tm/tm-de-all-v3.0.topic_model_topic_description.jsonl.bz2'}
 ```
 
 For a more details about the usage and the possibilities that this pipeline provides, please check out our demo [notebook](https://github.com/impresso/impresso-datalab-notebooks/blob/main/annotate/ldatopics_pipeline_demo.ipynb).

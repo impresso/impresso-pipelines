@@ -30,11 +30,18 @@ class MalletVectorizer:
     Handles the vectorization of a list of lemmatized words using Mallet without requiring input files.
     """
 
-    def __init__(self, pipe_file: str, output_file: str, keep_tmp_file: bool = False) -> None:
+    def __init__(
+        self,
+        pipe_file: str,
+        output_file: str,
+        keep_tmp_file: bool = False,
+        rewrite_pipe: bool = True,
+    ) -> None:
         self.vectorizer = Csv2Vectors()
         self.pipe_file = pipe_file
         self.output_file = os.path.join(os.path.dirname(__file__), output_file)  # Save in the same folder
         self.keep_tmp_file = keep_tmp_file
+        self.rewrite_pipe = rewrite_pipe
 
     def __call__(self, lemmatized_words: List[str], doc_name) -> str:
         """
@@ -57,11 +64,16 @@ class MalletVectorizer:
 
 
         # Arguments for Csv2Vectors
+        pipe_option = (
+            "--use-pipe-from"
+            if self.rewrite_pipe
+            else "--use-pipe-from-without-rewrite"
+        )
         arguments = [
             "--input", temp_input_file.name,
             "--output", self.output_file,
             "--keep-sequence",
-            "--use-pipe-from", self.pipe_file,
+            pipe_option, self.pipe_file,
         ]
 
         logging.info("Calling Mallet Csv2Vectors with arguments: %s", arguments)
