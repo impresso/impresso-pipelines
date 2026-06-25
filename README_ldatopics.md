@@ -85,13 +85,13 @@ print(result)
 **Expected Output:**
 ```
 {'uid': 'doc0',
- 'ts': '2025-08-20T14:31:44Z',
+ 'ts': '2026-06-25T10:38:56Z',
  'language': 'de',
  'topic_count': 100,
  'topics': 
       [
-        {'uid': 'tm-de-all-v3.0_tp30_de', 'relevance': 0.652},
-        {'uid': 'tm-de-all-v3.0_tp65_de', 'relevance': 0.041}
+        {'uid': 'tm-de-all-v3.0_tp34_de', 'relevance': 0.781},
+        {'uid': 'tm-de-all-v3.0_tp61_de', 'relevance': 0.092}
       ],
  'min_relevance': 0.02,
  'topic_model_id': 'tm-de-all-v3.0',
