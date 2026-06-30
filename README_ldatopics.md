@@ -15,7 +15,7 @@ flowchart TD
         n6["Produce <br>JSON output"]
   end
     A["(1) Input text (str)"] --> n1["(2) Langident"]
-    n1 -- de/fr/lb --> n2["(3) Tokenizer<br>POStagging<br>Lemmanizer<br>(SPACY)"]
+    n1 -- de/en/fr/lb --> n2["(3) Tokenizer<br>POStagging<br>Lemmanizer<br>(SPACY)"]
     n2 --> n3
     n3 --> n5
     s2 --> n6
@@ -33,7 +33,7 @@ flowchart TD
 The pipeline starts with a text input in string format. This could be any textual data that needs to be analyzed.
 
 ### 2. Langident (Language Identification)
-The system uses a language identification tool to detect the language of the input text. Based on the output, the text is classified as German (`de`), French (`fr`), or Luxembourgish (`lb`).
+The system uses a language identification tool to detect the language of the input text. Based on the output, the text is classified as German (`de`), English (`en`), French (`fr`), or Luxembourgish (`lb`).
 
 ### 3. Tokenizer, POS Tagging, and Lemmatization (Using SpaCy)
 Once the language is identified, the text undergoes several preprocessing steps:
