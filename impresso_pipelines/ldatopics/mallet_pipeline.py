@@ -5,7 +5,7 @@ This module provides a complete pipeline for extracting topics from text documen
 using Latent Dirichlet Allocation (LDA) via Mallet. It handles language detection,
 lemmatization with SpaCy, text vectorization, and topic inference.
 
-Supported languages: French (fr), German (de), Luxembourgish (lb)
+Supported languages: English (en), French (fr), German (de), Luxembourgish (lb)
 
 Example usage:
     >>> pipeline = LDATopicsPipeline()
@@ -387,6 +387,10 @@ class LDATopicsPipeline:
         """
         requested = str(self.topic_model_version).lower().lstrip("v")
         if requested == "2":
+            if self.language not in LEGACY_TOPIC_MODEL_VERSIONS:
+                raise ValueError(
+                    f"No legacy v2 topic model is available for language: {self.language}"
+                )
             version = LEGACY_TOPIC_MODEL_VERSIONS[self.language]
         elif requested == "3":
             version = "3.0"
