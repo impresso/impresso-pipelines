@@ -49,6 +49,9 @@ logger = logging.getLogger(__name__)
 
 HF_REPO_ID = "impresso-project/mallet-topic-inferencer"
 DEFAULT_TOPIC_MODEL_VERSION = "3.0"
+TOPIC_MODEL_LABELS_DISCLAIMER = (
+    "Topic labels were generated with AI and may contain mistakes."
+)
 MALLET_RUNTIME_V3 = "mallet-2.1.0"
 MALLET_RUNTIME_LEGACY = "mallet-legacy"
 _ACTIVE_MALLET_RUNTIME: Optional[str] = None
@@ -365,6 +368,9 @@ class LDATopicsPipeline:
         
         if diagnostics_topics:
             output = self.add_topic_words_to_output(output)
+            for entry in output:
+                entry["topic_model_labels"] = self.topic_model_labels_url()
+                entry["topic_model_labels_disclaimer"] = TOPIC_MODEL_LABELS_DISCLAIMER
         
         # Rename 'p' to 'relevance' in the topics list
         for entry in output:
@@ -462,6 +468,15 @@ class LDATopicsPipeline:
         return (
             f"https://huggingface.co/{HF_REPO_ID}/resolve/main/"
             f"{self.topic_model_description_filename()}"
+        )
+
+    def topic_model_labels_filename(self) -> str:
+        return f"models/tm/fixed_{self.language}.topic_labels.jsonl.bz2"
+
+    def topic_model_labels_url(self) -> str:
+        return (
+            f"https://huggingface.co/{HF_REPO_ID}/resolve/main/"
+            f"{self.topic_model_labels_filename()}"
         )
 
     def language_detection(self, text: str) -> str:
