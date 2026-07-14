@@ -436,6 +436,7 @@ class LDATopicsPipeline:
             preprocessing = {}
         return {
             **config,
+            "preprocessing": preprocessing,
             "language": config.get("language", self.language),
             "model_id": config.get("model_id", self.model_id),
             "topic_count": int(config.get("topic_count", 100)),
