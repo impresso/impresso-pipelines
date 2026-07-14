@@ -179,10 +179,11 @@ class SPACY:
         )
 
         self.vocab = load_vocab(vocab_path)
+        preprocessing = self.config.get("preprocessing", {})
+        if not isinstance(preprocessing, dict):
+            preprocessing = {}
         min_lemma_length = int(
-            self.config.get("preprocessing", {}).get(
-                "min_lemma_length", self.config.get("min_lemma_length", 3)
-            )
+            preprocessing.get("min_lemma_length", self.config.get("min_lemma_length", 3))
         )
         self.normalizer = LemmaNormalizer(
             load_translation_table(normalization_path),
