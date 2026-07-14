@@ -59,7 +59,7 @@ class LemmaNormalizer:
         boundary_chars: str = DEFAULT_BOUNDARY_CHARS,
         min_alpha: int = 3,
         min_alpha_ratio: float = 0.75,
-        cache_size: int = 2_000_000,
+        cache_size: int = 200_000,
     ) -> None:
         self.translation_table = translation_table
         self.boundary_chars = boundary_chars
