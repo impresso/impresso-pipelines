@@ -10,6 +10,9 @@ def load_ldatopics_config():
         / "config.py"
     )
     spec = importlib.util.spec_from_file_location("ldatopics_config", config_path)
+    assert spec is not None and spec.loader is not None, (
+        f"Failed to load ldatopics config module from {config_path}"
+    )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
