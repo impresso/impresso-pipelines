@@ -38,11 +38,13 @@ print(result['type'])  # 'ad' or 'non-ad'
 The pipeline accepts multiple input formats:
 
 ### 1. Single text string
+
 ```python
 result = pipeline("Your text here")
 ```
 
 ### 2. List of text strings
+
 ```python
 results = pipeline([
     "Text 1",
@@ -52,6 +54,7 @@ results = pipeline([
 ```
 
 ### 3. Single dictionary with 'ft' field
+
 ```python
 result = pipeline({
     "id": "doc1",
@@ -61,6 +64,7 @@ result = pipeline({
 ```
 
 ### 4. List of dictionaries
+
 ```python
 results = pipeline([
     {"id": "doc1", "ft": "Text 1", "lg": "fr"},
@@ -70,12 +74,21 @@ results = pipeline([
 
 ## Output Format
 
-Each result is a dictionary containing:
+Each result is a dictionary containing at least:
 
 ```python
 {
     "id": "doc1",                          # Document ID (if provided in input)
     "type": "ad",                          # Classification: "ad" or "non-ad"
+}
+```
+
+If you initialize the pipeline with `diagnostics=True`, the result also includes:
+
+```python
+{
+    "id": "doc1",
+    "type": "ad",
     "promotion_prob": 0.876543,           # Raw promotion probability
     "promotion_prob_final": 0.891234,     # Final probability after adjustments
     "ensemble_ad_signal": 0.823456,       # Ensemble signal from all genre predictions
@@ -112,11 +125,13 @@ pipeline = AdClassifierPipeline(
 ## Device Support
 
 The pipeline automatically detects and uses:
+
 - **CUDA** (NVIDIA GPUs) if available
 - **MPS** (Apple Silicon) if available
 - **CPU** as fallback
 
 You can manually specify the device:
+
 ```python
 pipeline = AdClassifierPipeline(device="cuda")  # Force CUDA
 pipeline = AdClassifierPipeline(device="mps")   # Force MPS (Apple Silicon)
@@ -126,6 +141,7 @@ pipeline = AdClassifierPipeline(device="cpu")   # Force CPU
 ## Model Details
 
 The pipeline uses the fine-tuned model from HuggingFace:
+
 - **Model**: `impresso-project/impresso-ad-classification-xlm-one-class`
 - **Revision**: `v2.0`
 - **Base**: XLM-RoBERTa
@@ -135,6 +151,7 @@ The pipeline uses the fine-tuned model from HuggingFace:
 ### Best Parameters
 
 The default parameters are optimized based on cross-validation:
+
 - **Pool**: `logits_max`
 - **Temperature**: `0.8`
 - **Ad threshold**: `0.9991` (for languages other than French)
@@ -155,7 +172,7 @@ The pipeline combines neural predictions with rule-based features for improved a
 
 ## Examples
 
-See [`impresso_pipelines/adclassifier/old/example_usage.py`](impresso_pipelines/adclassifier/old/example_usage.py) for complete examples.
+The runnable examples in this README cover the supported input forms and configuration options.
 
 ## Performance
 
