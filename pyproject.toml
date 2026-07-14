@@ -11,6 +11,7 @@ dependencies = [
     "cython",
     "numpy~=1.26",
     "pysolr",
+    "urllib3>=2.7.0",
 ]
 
 [project.optional-dependencies]
@@ -60,6 +61,7 @@ huggingface_hub = { version = "*", optional = true }
 floret = { version = "*", optional = true }
 pybloomfilter3 = { version = "*", optional = true }
 pysolr = "*"
+urllib3 = ">=2.7.0"
 
 jpype1 = { version = "~1.6", optional = true }
 smart_open = { version = "~6.3", optional = true }
