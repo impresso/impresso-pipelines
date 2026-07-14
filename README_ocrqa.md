@@ -60,10 +60,10 @@ OCRQAPipeline(
 # Use default repository
 pipeline = OCRQAPipeline()
 
-# Use custom repository and branch
+# Use the published Hugging Face repository explicitly
 pipeline = OCRQAPipeline(
-    repo_id="my-org/my-ocrqa-models",
-    revision="v2.0"
+    repo_id="impresso-project/OCR-quality-assessment-unigram",
+    revision="main"
 )
 
 # Customize score precision
@@ -230,6 +230,8 @@ print(result)  # {'language': 'en', 'score': 0.6}
 ### Custom Precision
 
 ```python
+text = "The quick brown fox jumps over the lazy dog."
+
 # Default: 2 decimal places
 pipeline_default = OCRQAPipeline()
 result = pipeline_default(text)

@@ -1,12 +1,11 @@
 ### Solr Normalization Example
+
 Make sure you have installed the package as demonstrated in the main [README](README.md).
 
 > **Note:** For more documentation and usage details, see the inline docstrings and comments in the code.
 
 ```python
 from impresso_pipelines.solrnormalization import SolrNormalizationPipeline
-# Initialize the pipeline
-pipeline = SolrNormalizationPipeline()
 
 # Example text in German
 de_text = """Vieles Seltsame geschieht auf Erden :
@@ -22,15 +21,18 @@ Und so jagt er zuletzt auf die Brücke,
 Die über dem Abgrund, d:m nächtlich schwarzen
 Jählings abbricht."""
 
-# Normalize the text
-result = pipeline(de_text)
-print(result)
+# Initialize the pipeline and ensure temporary resources are cleaned up
+with SolrNormalizationPipeline() as pipeline:
+    # Normalize the text
+    result = pipeline(de_text)
+    print(result)
 ```
 
 **Expected Output:**
+
 ```
 {'language': 'de',
- 'tokens': 
+ 'tokens':
     ['viel',
     'seltsam',
     'geschieht',
