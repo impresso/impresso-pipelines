@@ -1,4 +1,3 @@
-import pytest_lazyfixture
 from impresso_pipelines.newsagencies.newsagencies_pipeline import NewsAgenciesPipeline
 
 
