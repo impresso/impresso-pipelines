@@ -297,21 +297,75 @@ class MediaSourcesPipeline:
         diagnostics: bool = False,
     ) -> dict[str, Any] | list[dict[str, Any]]:
         single = isinstance(input_texts, str)
-        texts = [input_texts] if single else list(input_texts)
-        effective_min_score = self.default_min_score if min_score is None else min_score
-        _effective_batch_size = batch_size or self.default_batch_size
-        outputs = [self.predict_one(str(text), min_score=effective_min_score, diagnostics=diagnostics) for text in texts]
+        texts = [input_texts] if single else [str(text) for text in input_texts]
+        outputs = self.predict_many(
+            texts,
+            min_score=min_score,
+            batch_size=batch_size,
+            diagnostics=diagnostics,
+        )
         return outputs[0] if single else outputs
 
+    def predict_many(
+        self,
+        texts: Sequence[str],
+        *,
+        min_score: float | None = None,
+        batch_size: int | None = None,
+        diagnostics: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Predict documents while batching model inference across annotation windows."""
+        texts = [str(text) for text in texts]
+        if not texts:
+            return []
+
+        effective_min_score = self.default_min_score if min_score is None else min_score
+        effective_batch_size = self.default_batch_size if batch_size is None else batch_size
+        if effective_batch_size <= 0:
+            raise ValueError("batch_size must be positive")
+
+        tokenized = [tokenize_with_offsets(text) for text in texts]
+        tokens_by_doc = [tokens for tokens, _starts, _stops in tokenized]
+        word_log_probs_by_doc = self._word_log_probs_many(
+            tokens_by_doc,
+            batch_size=effective_batch_size,
+        )
+
+        return [
+            self._decode_result(
+                text,
+                tokens,
+                starts,
+                stops,
+                word_log_probs,
+                min_score=effective_min_score,
+                diagnostics=diagnostics,
+            )
+            for text, (tokens, starts, stops), word_log_probs in zip(
+                texts, tokenized, word_log_probs_by_doc, strict=True
+            )
+        ]
+
     def predict_one(self, text: str, *, min_score: float | None = None, diagnostics: bool = False) -> dict[str, Any]:
-        tokens, starts, stops = tokenize_with_offsets(text)
+        return self.predict_many([text], min_score=min_score, batch_size=1, diagnostics=diagnostics)[0]
+
+    def _decode_result(
+        self,
+        text: str,
+        tokens: Sequence[str],
+        starts: Sequence[int],
+        stops: Sequence[int],
+        word_log_probs: Sequence[Sequence[Sequence[float]]],
+        *,
+        min_score: float | None,
+        diagnostics: bool,
+    ) -> dict[str, Any]:
         if not tokens:
             result: dict[str, Any] = {"entities": [], "summary": []}
             if diagnostics:
                 result["text"] = text
             return result
 
-        word_log_probs = self._word_log_probs(tokens)
         pred_ids = decode_document(word_log_probs, decoder=self.decoder, schema=self.schema)
         labels = [self.id2label[int(label_id)] for label_id in pred_ids]
         token_scores = [
@@ -331,9 +385,9 @@ class MediaSourcesPipeline:
         if diagnostics:
             return {
                 "text": text,
-                "tokens": tokens,
-                "token_start_offsets": starts,
-                "token_end_offsets": stops,
+                "tokens": list(tokens),
+                "token_start_offsets": list(starts),
+                "token_end_offsets": list(stops),
                 "token_labels": labels,
                 "token_scores": token_scores,
                 "entities": entities,
@@ -352,49 +406,86 @@ class MediaSourcesPipeline:
         ]
 
     def _word_log_probs(self, tokens: Sequence[str]) -> list[list[list[float]]]:
+        return self._word_log_probs_many([tokens], batch_size=1)[0]
+
+    def _word_log_probs_many(
+        self,
+        tokens_by_doc: Sequence[Sequence[str]],
+        *,
+        batch_size: int,
+    ) -> list[list[list[list[float]]]]:
+        """Run flattened windows from many documents through the model in batches."""
         import torch
 
-        windows = make_windows(tokens, max_annotation_tokens=self.max_annotation_tokens, stride=self.stride)
-        word_log_probs: list[list[list[float]] | None] = [None for _ in tokens]
-        word_source_window: list[int | None] = [None for _ in tokens]
+        if batch_size <= 0:
+            raise ValueError("batch_size must be positive")
+
+        # Flatten windows while retaining enough metadata to restore document/token
+        # positions. As before, overlapping tokens use the first window that covers
+        # them, preserving the existing inference semantics.
+        flat_windows: list[tuple[int, int, Window]] = []
+        for doc_index, tokens in enumerate(tokens_by_doc):
+            for window_index, window in enumerate(
+                make_windows(tokens, max_annotation_tokens=self.max_annotation_tokens, stride=self.stride)
+            ):
+                flat_windows.append((doc_index, window_index, window))
+
+        word_log_probs: list[list[list[list[float]] | None]] = [
+            [None for _ in tokens] for tokens in tokens_by_doc
+        ]
+        word_source_window: list[list[int | None]] = [
+            [None for _ in tokens] for tokens in tokens_by_doc
+        ]
 
         with torch.no_grad():
-            for window_index, window in enumerate(windows):
+            for batch_start in range(0, len(flat_windows), batch_size):
+                batch = flat_windows[batch_start : batch_start + batch_size]
+                batch_tokens = [window.tokens for _doc_index, _window_index, window in batch]
                 encoding = self.tokenizer(
-                    window.tokens,
+                    batch_tokens,
                     is_split_into_words=True,
+                    padding=True,
                     truncation=True,
                     max_length=self.max_sequence_len,
                     return_offsets_mapping=False,
                     return_tensors="pt",
                 )
-                word_ids = encoding.word_ids()
                 model_inputs = self._model_inputs(dict(encoding))
                 outputs = self.model(**model_inputs)
                 log_probabilities = torch.log_softmax(outputs.logits.detach().cpu(), dim=-1)
                 attention_mask = model_inputs.get("attention_mask")
-                attention_values = attention_mask.detach().cpu().tolist()[0] if attention_mask is not None else None
+                attention_values = attention_mask.detach().cpu().tolist() if attention_mask is not None else None
 
-                for subtoken_index, word_id in enumerate(word_ids):
-                    if attention_values is not None and not attention_values[subtoken_index]:
-                        continue
-                    if word_id is None:
-                        continue
-                    absolute_token = window.start_token + int(word_id)
-                    if not 0 <= absolute_token < len(tokens):
-                        continue
-                    source_window = word_source_window[absolute_token]
-                    if source_window is None:
-                        word_source_window[absolute_token] = window_index
-                        word_log_probs[absolute_token] = []
-                    if word_source_window[absolute_token] == window_index:
-                        word_log_probs[absolute_token].append(log_probabilities[0, subtoken_index].tolist())
+                for batch_index, (doc_index, window_index, window) in enumerate(batch):
+                    word_ids = encoding.word_ids(batch_index=batch_index)
+                    for subtoken_index, word_id in enumerate(word_ids):
+                        if attention_values is not None and not attention_values[batch_index][subtoken_index]:
+                            continue
+                        if word_id is None:
+                            continue
+                        absolute_token = window.start_token + int(word_id)
+                        if not 0 <= absolute_token < len(tokens_by_doc[doc_index]):
+                            continue
+                        source_window = word_source_window[doc_index][absolute_token]
+                        if source_window is None:
+                            word_source_window[doc_index][absolute_token] = window_index
+                            word_log_probs[doc_index][absolute_token] = []
+                        if word_source_window[doc_index][absolute_token] == window_index:
+                            word_log_probs[doc_index][absolute_token].append(
+                                log_probabilities[batch_index, subtoken_index].tolist()
+                            )
 
-        out: list[list[list[float]]] = []
-        for token_index, subtokens in enumerate(word_log_probs):
-            if not subtokens:
-                raise ValueError(f"model/tokenizer produced no subtokens for token {token_index}: {tokens[token_index]!r}")
-            out.append(subtokens)
+        out: list[list[list[list[float]]]] = []
+        for doc_index, (tokens, doc_log_probs) in enumerate(zip(tokens_by_doc, word_log_probs, strict=True)):
+            doc_out: list[list[list[float]]] = []
+            for token_index, subtokens in enumerate(doc_log_probs):
+                if not subtokens:
+                    raise ValueError(
+                        "model/tokenizer produced no subtokens for "
+                        f"document {doc_index}, token {token_index}: {tokens[token_index]!r}"
+                    )
+                doc_out.append(subtokens)
+            out.append(doc_out)
         return out
 
     def _model_inputs(self, encoding: dict[str, Any]) -> dict[str, Any]:

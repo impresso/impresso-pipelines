@@ -20,19 +20,27 @@ ID2LABEL = {
 
 
 class FakeEncoding(dict):
-    def __init__(self, tokens: list[str], label_ids: list[int], logits_by_token: list[list[float]] | None = None):
+    def __init__(self, token_batches: list[list[str]], label_id_batches: list[list[int]], logits_by_token: list[list[list[float]]] | None = None):
+        max_len = max((len(tokens) for tokens in token_batches), default=0)
         super().__init__(
             {
-                "input_ids": torch.tensor([[100 + index for index in range(len(tokens))]]),
-                "attention_mask": torch.tensor([[1 for _token in tokens]]),
+                "input_ids": torch.tensor(
+                    [
+                        [100 + index for index in range(len(tokens))] + [0] * (max_len - len(tokens))
+                        for tokens in token_batches
+                    ]
+                ),
+                "attention_mask": torch.tensor(
+                    [[1 for _token in tokens] + [0] * (max_len - len(tokens)) for tokens in token_batches]
+                ),
             }
         )
-        self._word_ids = list(range(len(tokens)))
-        self.label_ids = label_ids
+        self._word_ids = [list(range(len(tokens))) + [None] * (max_len - len(tokens)) for tokens in token_batches]
+        self.label_ids = label_id_batches
         self.logits_by_token = logits_by_token
 
-    def word_ids(self) -> list[int]:
-        return self._word_ids
+    def word_ids(self, batch_index: int = 0) -> list[int | None]:
+        return self._word_ids[batch_index]
 
 
 class FakeTokenizer:
@@ -41,13 +49,31 @@ class FakeTokenizer:
         self.logits_by_token = logits_by_token or {}
         self.calls: list[list[str]] = []
 
-    def __call__(self, tokens: list[str], **_kwargs: object) -> FakeEncoding:
-        self.calls.append(list(tokens))
-        logits = [self.logits_by_token[token] for token in tokens] if all(token in self.logits_by_token for token in tokens) else None
-        encoding = FakeEncoding(tokens, [self.label_by_token.get(token, 0) for token in tokens], logits)
+    def __call__(self, tokens: list[str] | list[list[str]], **_kwargs: object) -> FakeEncoding:
+        token_batches = tokens if tokens and isinstance(tokens[0], list) else [tokens]
+        self.calls.extend([list(token_batch) for token_batch in token_batches])
+        label_id_batches = [
+            [self.label_by_token.get(token, 0) for token in token_batch]
+            for token_batch in token_batches
+        ]
+        has_explicit_logits = all(
+            token in self.logits_by_token
+            for token_batch in token_batches
+            for token in token_batch
+        )
+        logits = [
+            [self.logits_by_token[token] for token in token_batch]
+            for token_batch in token_batches
+        ] if has_explicit_logits else None
+        encoding = FakeEncoding(token_batches, label_id_batches, logits)
         encoding["_label_ids"] = encoding.label_ids
         if logits is not None:
-            encoding["_logits"] = torch.tensor([logits])
+            max_len = max(len(row) for row in logits)
+            padded_logits = [
+                row + [[0.0 for _ in ID2LABEL] for _pad in range(max_len - len(row))]
+                for row in logits
+            ]
+            encoding["_logits"] = torch.tensor(padded_logits)
         return encoding
 
 
@@ -62,6 +88,7 @@ class FakeModel:
             stride=32,
         )
         self.device = torch.device("cpu")
+        self.batch_sizes: list[int] = []
 
     def to(self, device):
         self.device = torch.device(device)
@@ -73,11 +100,15 @@ class FakeModel:
     def __call__(self, **inputs):
         explicit_logits = inputs.pop("_logits", None)
         if explicit_logits is not None:
+            self.batch_sizes.append(int(explicit_logits.shape[0]))
             return SimpleNamespace(logits=explicit_logits)
         label_ids = inputs.pop("_label_ids")
-        logits = torch.full((1, len(label_ids), len(ID2LABEL)), -10.0)
-        for token_index, label_id in enumerate(label_ids):
-            logits[0, token_index, label_id] = 10.0
+        self.batch_sizes.append(len(label_ids))
+        max_len = max((len(row) for row in label_ids), default=0)
+        logits = torch.full((len(label_ids), max_len, len(ID2LABEL)), -10.0)
+        for batch_index, row in enumerate(label_ids):
+            for token_index, label_id in enumerate(row):
+                logits[batch_index, token_index, label_id] = 10.0
         return SimpleNamespace(logits=logits)
 
 
@@ -201,6 +232,31 @@ def test_long_input_uses_first_covering_window_for_overlaps() -> None:
     assert tokenizer.calls == [["a", "b", "Reuters", "c"], ["Reuters", "c", "d", "e"]]
     assert result["entities"][0]["surface"] == "Reuters"
     assert result["token_labels"] == ["O", "O", "B-org.ent.pressagency.reuters", "O", "O", "O"]
+
+
+def test_predict_many_batches_windows_across_documents() -> None:
+    model = FakeModel()
+    tokenizer = FakeTokenizer({"Reuters": 1, "BBC": 3})
+    pipe = MediaSourcesPipeline(model, tokenizer=tokenizer, device=-1, batch_size=2)
+
+    results = pipe(["Reuters said.", "BBC said.", "No source."])
+
+    assert model.batch_sizes == [2, 1]
+    assert [call[0] for call in tokenizer.calls] == ["Reuters", "BBC", "No"]
+    assert results[0]["entities"][0]["label"] == "org.ent.pressagency.reuters"
+    assert results[1]["entities"][0]["label"] == "org.ent.radiostation.bbc"
+    assert results[2]["entities"] == []
+
+
+def test_predict_many_preserves_mixed_empty_document_order() -> None:
+    pipe = make_pipeline({"Reuters": 1})
+
+    results = pipe(["", "Reuters said.", "   "], diagnostics=True)
+
+    assert len(results) == 3
+    assert results[0] == {"entities": [], "summary": [], "text": ""}
+    assert results[1]["entities"][0]["surface"] == "Reuters"
+    assert results[2] == {"entities": [], "summary": [], "text": "   "}
 
 
 def test_pipeline_rejects_incompatible_model_metadata() -> None:
