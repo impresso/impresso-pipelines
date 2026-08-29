@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from types import SimpleNamespace
 
 import pytest
@@ -20,7 +21,13 @@ ID2LABEL = {
 
 
 class FakeEncoding(dict):
-    def __init__(self, token_batches: list[list[str]], label_id_batches: list[list[int]], logits_by_token: list[list[list[float]]] | None = None):
+    def __init__(
+        self,
+        token_batches: list[list[str]],
+        label_id_batches: list[list[int]],
+        logits_by_token: list[list[list[float]]] | None = None,
+        word_id_batches: list[list[int | None]] | None = None,
+    ):
         max_len = max((len(tokens) for tokens in token_batches), default=0)
         super().__init__(
             {
@@ -35,7 +42,9 @@ class FakeEncoding(dict):
                 ),
             }
         )
-        self._word_ids = [list(range(len(tokens))) + [None] * (max_len - len(tokens)) for tokens in token_batches]
+        self._word_ids = word_id_batches or [
+            list(range(len(tokens))) + [None] * (max_len - len(tokens)) for tokens in token_batches
+        ]
         self.label_ids = label_id_batches
         self.logits_by_token = logits_by_token
 
@@ -129,6 +138,95 @@ class TokenTypeIdsTokenizer(FakeTokenizer):
         return encoding
 
 
+class TruncatingTokenizer(FakeTokenizer):
+    def __init__(self, label_by_token: dict[str, int], *, covered_tokens: int):
+        super().__init__(label_by_token)
+        self.covered_tokens = covered_tokens
+
+    def __call__(self, tokens: list[str] | list[list[str]], **_kwargs: object) -> FakeEncoding:
+        token_batches = tokens if tokens and isinstance(tokens[0], list) else [tokens]
+        self.calls.extend([list(token_batch) for token_batch in token_batches])
+        represented_batches = [list(token_batch[: self.covered_tokens]) for token_batch in token_batches]
+        label_id_batches = [
+            [self.label_by_token.get(token, 0) for token in represented_batch]
+            for represented_batch in represented_batches
+        ]
+        encoding = FakeEncoding(
+            represented_batches,
+            label_id_batches,
+            word_id_batches=[
+                list(range(len(represented_batch)))
+                for represented_batch in represented_batches
+            ],
+        )
+        encoding["_label_ids"] = encoding.label_ids
+        return encoding
+
+
+class OverflowTokenizer(FakeTokenizer):
+    def __init__(self, label_by_token: dict[str, int]):
+        super().__init__(label_by_token)
+        self.chunks: list[list[str]] = []
+
+    def __call__(self, tokens: list[str] | list[list[str]], **kwargs: object) -> FakeEncoding:
+        token_batches = tokens if tokens and isinstance(tokens[0], list) else [tokens]
+        self.calls.extend([list(token_batch) for token_batch in token_batches])
+        max_length = int(kwargs["max_length"])
+        stride = int(kwargs.get("stride", 0))
+        step = max_length - stride
+        chunk_batches: list[list[str]] = []
+        word_id_batches: list[list[int | None]] = []
+        sample_mapping: list[int] = []
+        for sample_index, token_batch in enumerate(token_batches):
+            start = 0
+            while start < len(token_batch):
+                stop = min(start + max_length, len(token_batch))
+                chunk = list(token_batch[start:stop])
+                chunk_batches.append(chunk)
+                self.chunks.append(chunk)
+                word_id_batches.append(list(range(start, stop)))
+                sample_mapping.append(sample_index)
+                if stop == len(token_batch):
+                    break
+                start += step
+        label_id_batches = [
+            [self.label_by_token.get(token, 0) for token in chunk]
+            for chunk in chunk_batches
+        ]
+        encoding = FakeEncoding(chunk_batches, label_id_batches, word_id_batches=word_id_batches)
+        encoding["_label_ids"] = encoding.label_ids
+        encoding["overflow_to_sample_mapping"] = torch.tensor(sample_mapping)
+        return encoding
+
+
+class PartialBoundaryTokenizer(FakeTokenizer):
+    def __call__(self, tokens: list[str] | list[list[str]], **_kwargs: object) -> FakeEncoding:
+        token_batches = tokens if tokens and isinstance(tokens[0], list) else [tokens]
+        self.calls.extend([list(token_batch) for token_batch in token_batches])
+        encoding = FakeEncoding(
+            [["alpha", "fragment"], ["fragment", "fragment", "fragment", "omega"]],
+            [[0, 3], [1, 2, 2, 0]],
+            word_id_batches=[[0, 1], [1, 1, 1, 2]],
+        )
+        encoding["_label_ids"] = encoding.label_ids
+        encoding["overflow_to_sample_mapping"] = torch.tensor([0, 0])
+        return encoding
+
+
+class EqualBoundaryTokenizer(FakeTokenizer):
+    def __call__(self, tokens: list[str] | list[list[str]], **_kwargs: object) -> FakeEncoding:
+        token_batches = tokens if tokens and isinstance(tokens[0], list) else [tokens]
+        self.calls.extend([list(token_batch) for token_batch in token_batches])
+        encoding = FakeEncoding(
+            [["alpha", "target"], ["target", "omega"]],
+            [[0, 1], [3, 0]],
+            word_id_batches=[[0, 1], [1, 2]],
+        )
+        encoding["_label_ids"] = encoding.label_ids
+        encoding["overflow_to_sample_mapping"] = torch.tensor([0, 0])
+        return encoding
+
+
 def make_pipeline(
     label_by_token: dict[str, int],
     logits_by_token: dict[str, list[float]] | None = None,
@@ -174,6 +272,13 @@ def test_diagnostics_return_decoded_entities_with_exact_offsets() -> None:
             "score": pytest.approx(1.0),
         }
     ]
+    assert result["inference_diagnostics"] == {
+        "annotation_tokens": 6,
+        "model_chunks": 1,
+        "overlapping_annotation_tokens": 0,
+        "overlap_replacements": 0,
+        "rescued_tokens": [],
+    }
 
 
 def test_score_marginalizes_over_bio_state_for_decoded_entity() -> None:
@@ -217,21 +322,170 @@ def test_min_score_filters_only_after_decoding_and_entity_scoring() -> None:
     assert filtered["summary"] == []
 
 
-def test_long_input_uses_first_covering_window_for_overlaps() -> None:
-    tokenizer = FakeTokenizer({"Reuters": 1})
+def test_default_stride_is_48_subtokens() -> None:
+    pipe = make_pipeline({})
+
+    assert pipe.stride == 48
+
+
+def test_long_input_uses_first_covering_tokenizer_chunk_for_overlaps() -> None:
+    tokenizer = OverflowTokenizer({"Reuters": 1})
     pipe = MediaSourcesPipeline(
         FakeModel(),
         tokenizer=tokenizer,
         device=-1,
-        max_annotation_tokens=4,
+        max_sequence_len=4,
         stride=2,
     )
 
     result = pipe("a b Reuters c d e", diagnostics=True)
 
-    assert tokenizer.calls == [["a", "b", "Reuters", "c"], ["Reuters", "c", "d", "e"]]
+    assert tokenizer.calls == [["a", "b", "Reuters", "c", "d", "e"]]
+    assert tokenizer.chunks == [["a", "b", "Reuters", "c"], ["Reuters", "c", "d", "e"]]
     assert result["entities"][0]["surface"] == "Reuters"
     assert result["token_labels"] == ["O", "O", "B-org.ent.pressagency.reuters", "O", "O", "O"]
+
+
+def test_truncated_window_tail_tokens_are_retried_as_singletons() -> None:
+    tokenizer = TruncatingTokenizer({"49": 1}, covered_tokens=3)
+    pipe = MediaSourcesPipeline(
+        FakeModel(),
+        tokenizer=tokenizer,
+        device=-1,
+        max_annotation_tokens=5,
+        stride=1,
+    )
+
+    result = pipe("a b c 49 d", diagnostics=True)
+
+    assert tokenizer.calls == [["a", "b", "c", "49", "d"], ["49"], ["d"]]
+    assert result["token_labels"] == ["O", "O", "O", "B-org.ent.pressagency.reuters", "O"]
+    assert result["entities"][0]["surface"] == "49"
+    assert result["inference_diagnostics"] == {
+        "annotation_tokens": 5,
+        "model_chunks": 1,
+        "overlapping_annotation_tokens": 0,
+        "overlap_replacements": 0,
+        "rescued_tokens": [3, 4],
+    }
+
+
+def test_tokenizer_native_overflow_uses_subtoken_stride_without_rescue() -> None:
+    tokenizer = OverflowTokenizer({"ee": 1})
+    pipe = MediaSourcesPipeline(
+        FakeModel(),
+        tokenizer=tokenizer,
+        device=-1,
+        max_sequence_len=5,
+        stride=2,
+    )
+
+    result = pipe("aa bb cc dd ee ff gg hh ii jj kk ll", diagnostics=True)
+
+    assert tokenizer.calls == [
+        ["aa", "bb", "cc", "dd", "ee", "ff", "gg", "hh", "ii", "jj", "kk", "ll"],
+    ]
+    assert tokenizer.chunks == [
+        ["aa", "bb", "cc", "dd", "ee"],
+        ["dd", "ee", "ff", "gg", "hh"],
+        ["gg", "hh", "ii", "jj", "kk"],
+        ["jj", "kk", "ll"],
+    ]
+    assert result["entities"][0]["surface"] == "ee"
+    assert result["inference_diagnostics"]["model_chunks"] == 4
+    assert result["inference_diagnostics"]["overlapping_annotation_tokens"] == 6
+    assert result["inference_diagnostics"]["rescued_tokens"] == []
+
+
+def test_tokenizer_native_overflow_reconstructs_multiple_documents() -> None:
+    tokenizer = OverflowTokenizer({"aa": 1, "gg": 3, "jj": 1})
+    pipe = MediaSourcesPipeline(
+        FakeModel(),
+        tokenizer=tokenizer,
+        device=-1,
+        max_sequence_len=3,
+        stride=1,
+    )
+
+    results = pipe(
+        [
+            "aa bb cc dd ee",
+            "ff gg hh ii",
+            "jj",
+        ],
+        diagnostics=True,
+    )
+
+    assert tokenizer.chunks == [
+        ["aa", "bb", "cc"],
+        ["cc", "dd", "ee"],
+        ["ff", "gg", "hh"],
+        ["hh", "ii"],
+        ["jj"],
+    ]
+    assert [result["inference_diagnostics"]["model_chunks"] for result in results] == [2, 2, 1]
+    assert [result["inference_diagnostics"]["overlapping_annotation_tokens"] for result in results] == [1, 1, 0]
+    assert [result["token_labels"] for result in results] == [
+        ["B-org.ent.pressagency.reuters", "O", "O", "O", "O"],
+        ["O", "B-org.ent.radiostation.bbc", "O", "O"],
+        ["B-org.ent.pressagency.reuters"],
+    ]
+    assert [result["inference_diagnostics"]["rescued_tokens"] for result in results] == [[], [], []]
+
+
+def test_later_overlap_replaces_partial_word_representation() -> None:
+    pipe = MediaSourcesPipeline(
+        FakeModel(),
+        tokenizer=PartialBoundaryTokenizer({}),
+        device=-1,
+    )
+
+    word_log_probs = pipe._word_log_probs(["alpha", "fragment", "omega"])
+
+    assert [len(subtokens) for subtokens in word_log_probs] == [1, 3, 1]
+
+
+def test_later_overlap_replaces_partial_word_label() -> None:
+    pipe = MediaSourcesPipeline(
+        FakeModel(),
+        tokenizer=PartialBoundaryTokenizer({}),
+        device=-1,
+    )
+
+    result = pipe("alpha fragment omega", diagnostics=True)
+
+    assert result["token_labels"] == ["O", "B-org.ent.pressagency.reuters", "O"]
+    assert result["inference_diagnostics"]["overlap_replacements"] == 1
+
+
+def test_equal_length_overlap_keeps_first_representation() -> None:
+    pipe = MediaSourcesPipeline(
+        FakeModel(),
+        tokenizer=EqualBoundaryTokenizer({}),
+        device=-1,
+    )
+
+    result = pipe("alpha target omega", diagnostics=True)
+
+    assert result["token_labels"] == ["O", "B-org.ent.pressagency.reuters", "O"]
+    assert result["inference_diagnostics"]["overlap_replacements"] == 0
+
+
+def test_singleton_rescue_failure_still_raises_clear_error() -> None:
+    tokenizer = TruncatingTokenizer({}, covered_tokens=0)
+    pipe = MediaSourcesPipeline(
+        FakeModel(),
+        tokenizer=tokenizer,
+        device=-1,
+        max_annotation_tokens=2,
+        stride=1,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="model/tokenizer produced no subtokens for document 0, token 0: 'a'",
+    ):
+        pipe("a")
 
 
 def test_predict_many_batches_windows_across_documents() -> None:
@@ -248,15 +502,49 @@ def test_predict_many_batches_windows_across_documents() -> None:
     assert results[2]["entities"] == []
 
 
+def test_predict_many_logs_entity_statistics(caplog) -> None:
+    pipe = make_pipeline({"Reuters": 1, "BBC": 3})
+
+    with caplog.at_level(logging.INFO, logger=mediasources_module.__name__):
+        pipe(["Reuters said.", "BBC said.", "No source."])
+
+    assert (
+        "MediaSources entities: documents=3, documents_with_entities=2, entities=2, "
+        "labels=org.ent.pressagency.reuters=1, org.ent.radiostation.bbc=1"
+    ) in caplog.text
+
+
 def test_predict_many_preserves_mixed_empty_document_order() -> None:
     pipe = make_pipeline({"Reuters": 1})
 
     results = pipe(["", "Reuters said.", "   "], diagnostics=True)
 
     assert len(results) == 3
-    assert results[0] == {"entities": [], "summary": [], "text": ""}
+    assert results[0] == {
+        "entities": [],
+        "summary": [],
+        "text": "",
+        "inference_diagnostics": {
+            "annotation_tokens": 0,
+            "model_chunks": 0,
+            "overlapping_annotation_tokens": 0,
+            "overlap_replacements": 0,
+            "rescued_tokens": [],
+        },
+    }
     assert results[1]["entities"][0]["surface"] == "Reuters"
-    assert results[2] == {"entities": [], "summary": [], "text": "   "}
+    assert results[2] == {
+        "entities": [],
+        "summary": [],
+        "text": "   ",
+        "inference_diagnostics": {
+            "annotation_tokens": 0,
+            "model_chunks": 0,
+            "overlapping_annotation_tokens": 0,
+            "overlap_replacements": 0,
+            "rescued_tokens": [],
+        },
+    }
 
 
 def test_pipeline_rejects_incompatible_model_metadata() -> None:
@@ -265,6 +553,11 @@ def test_pipeline_rejects_incompatible_model_metadata() -> None:
 
     with pytest.raises(ValueError, match="unsupported annotation tokenization"):
         MediaSourcesPipeline(model, tokenizer=FakeTokenizer({}), device=-1)
+
+
+def test_pipeline_requires_tokenizer_for_instantiated_model() -> None:
+    with pytest.raises(ValueError, match="tokenizer must be provided"):
+        MediaSourcesPipeline(FakeModel(), device=-1)
 
 
 def test_pipeline_drops_token_type_ids_for_modernbert_forward_signature() -> None:

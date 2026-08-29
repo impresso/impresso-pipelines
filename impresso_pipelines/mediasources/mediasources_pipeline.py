@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import inspect
+import logging
 import re
+from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,12 +23,15 @@ from .decoding import (
 from .config import LABEL_WKDATA_QIDS
 
 
+logger = logging.getLogger(__name__)
+
+
 DEFAULT_MODEL = "impresso-project/mmbert-impresso-mediasources-ner"
 DEFAULT_REVISION = "v2.0.0"
 TOKENIZATION_PROFILE = "unicode-word-punctuation-v1"
 DEFAULT_MAX_SEQUENCE_LEN = 512
 DEFAULT_MAX_ANNOTATION_TOKENS = 256
-DEFAULT_STRIDE = 32
+DEFAULT_STRIDE = 48
 TOKEN_RE = re.compile(r"[^\W\d_]+|\d+|_+|[^\w\s]", re.UNICODE)
 
 
@@ -34,6 +39,21 @@ TOKEN_RE = re.compile(r"[^\W\d_]+|\d+|_+|[^\w\s]", re.UNICODE)
 class Window:
     start_token: int
     tokens: list[str]
+
+
+@dataclass(frozen=True)
+class DocumentWindowingDiagnostics:
+    annotation_tokens: int
+    model_chunks: int
+    overlapping_annotation_tokens: int
+    overlap_replacements: int
+    rescued_tokens: list[int]
+
+
+@dataclass(frozen=True)
+class WordLogProbResults:
+    word_log_probs_by_doc: list[list[list[list[float]]]]
+    diagnostics_by_doc: list[DocumentWindowingDiagnostics]
 
 
 def tokenize_with_offsets(text: str) -> tuple[list[str], list[int], list[int]]:
@@ -45,6 +65,8 @@ def tokenize_with_offsets(text: str) -> tuple[list[str], list[int], list[int]]:
     )
 
 
+# Legacy annotation-word windowing protocol. Retained for training and
+# compatibility experiments; tokenizer-native inference does not use this.
 def make_windows(tokens: Sequence[str], *, max_annotation_tokens: int, stride: int) -> list[Window]:
     if max_annotation_tokens <= 0:
         raise ValueError("max_annotation_tokens must be positive")
@@ -215,12 +237,17 @@ class MediaSourcesPipeline:
             )
         else:
             self.model = model
-        self.tokenizer = tokenizer or load_tokenizer(
-            model,
-            revision=revision,
-            local_files_only=local_files_only,
-            trust_remote_code=trust_remote_code,
-        )
+        if tokenizer is not None:
+            self.tokenizer = tokenizer
+        elif isinstance(model, str):
+            self.tokenizer = load_tokenizer(
+                model,
+                revision=revision,
+                local_files_only=local_files_only,
+                trust_remote_code=trust_remote_code,
+            )
+        else:
+            raise ValueError("tokenizer must be provided when model is an instantiated model")
 
         self.id2label = normalize_id2label(self.model.config.id2label)
         self.schema = compile_bio_schema(self.id2label)
@@ -230,15 +257,31 @@ class MediaSourcesPipeline:
         if self.decoder not in DECODER_CHOICES:
             raise ValueError(f"unsupported decoder: {self.decoder!r}; expected one of {DECODER_CHOICES}")
 
-        self.max_sequence_len = max_sequence_len or int(
-            self._model_protocol_value("max_sequence_len") or DEFAULT_MAX_SEQUENCE_LEN
+        self.max_sequence_len = (
+            int(self._model_protocol_value("max_sequence_len") or DEFAULT_MAX_SEQUENCE_LEN)
+            if max_sequence_len is None
+            else max_sequence_len
         )
-        self.max_annotation_tokens = max_annotation_tokens or int(
-            self._model_protocol_value("max_annotation_tokens", "max_words_per_window") or DEFAULT_MAX_ANNOTATION_TOKENS
+        self.max_annotation_tokens = (
+            int(self._model_protocol_value("max_annotation_tokens", "max_words_per_window") or DEFAULT_MAX_ANNOTATION_TOKENS)
+            if max_annotation_tokens is None
+            else max_annotation_tokens
         )
-        self.stride = stride or int(self._model_protocol_value("stride", "stride_words") or DEFAULT_STRIDE)
+        self.stride = (
+            int(self._model_protocol_value("subtoken_stride", "stride_subtokens") or DEFAULT_STRIDE)
+            if stride is None
+            else stride
+        )
 
         self._validate_model_protocol(decoder_override=decoder is not None)
+        if self.max_sequence_len <= 0:
+            raise ValueError("max_sequence_len must be positive")
+        if self.max_annotation_tokens <= 0:
+            raise ValueError("max_annotation_tokens must be positive")
+        if self.stride < 0:
+            raise ValueError("stride must not be negative")
+        if self.stride >= self.max_sequence_len:
+            raise ValueError("stride must be smaller than max_sequence_len")
         if hasattr(self.model, "to"):
             self.model.to(self.device)
         if hasattr(self.model, "eval"):
@@ -326,28 +369,56 @@ class MediaSourcesPipeline:
 
         tokenized = [tokenize_with_offsets(text) for text in texts]
         tokens_by_doc = [tokens for tokens, _starts, _stops in tokenized]
-        word_log_probs_by_doc = self._word_log_probs_many(
+        word_log_prob_results = self._word_log_probs_many(
             tokens_by_doc,
             batch_size=effective_batch_size,
         )
 
-        return [
+        results = [
             self._decode_result(
                 text,
                 tokens,
                 starts,
                 stops,
                 word_log_probs,
+                inference_diagnostics,
                 min_score=effective_min_score,
                 diagnostics=diagnostics,
             )
-            for text, (tokens, starts, stops), word_log_probs in zip(
-                texts, tokenized, word_log_probs_by_doc, strict=True
+            for text, (tokens, starts, stops), word_log_probs, inference_diagnostics in zip(
+                texts,
+                tokenized,
+                word_log_prob_results.word_log_probs_by_doc,
+                word_log_prob_results.diagnostics_by_doc,
+                strict=True,
             )
         ]
+        self._log_entity_stats(results)
+        return results
 
     def predict_one(self, text: str, *, min_score: float | None = None, diagnostics: bool = False) -> dict[str, Any]:
         return self.predict_many([text], min_score=min_score, batch_size=1, diagnostics=diagnostics)[0]
+
+    def _log_entity_stats(self, results: Sequence[dict[str, Any]]) -> None:
+        entity_counts = Counter(
+            str(entity["label"])
+            for result in results
+            for entity in result.get("entities", [])
+            if isinstance(entity, dict) and "label" in entity
+        )
+        entity_total = sum(entity_counts.values())
+        documents_with_entities = sum(1 for result in results if result.get("entities"))
+        if entity_counts:
+            labels = ", ".join(f"{label}={count}" for label, count in entity_counts.most_common())
+        else:
+            labels = "none"
+        logger.info(
+            "MediaSources entities: documents=%d, documents_with_entities=%d, entities=%d, labels=%s",
+            len(results),
+            documents_with_entities,
+            entity_total,
+            labels,
+        )
 
     def _decode_result(
         self,
@@ -356,6 +427,7 @@ class MediaSourcesPipeline:
         starts: Sequence[int],
         stops: Sequence[int],
         word_log_probs: Sequence[Sequence[Sequence[float]]],
+        inference_diagnostics: DocumentWindowingDiagnostics,
         *,
         min_score: float | None,
         diagnostics: bool,
@@ -364,6 +436,13 @@ class MediaSourcesPipeline:
             result: dict[str, Any] = {"entities": [], "summary": []}
             if diagnostics:
                 result["text"] = text
+                result["inference_diagnostics"] = {
+                    "annotation_tokens": inference_diagnostics.annotation_tokens,
+                    "model_chunks": inference_diagnostics.model_chunks,
+                    "overlapping_annotation_tokens": inference_diagnostics.overlapping_annotation_tokens,
+                    "overlap_replacements": inference_diagnostics.overlap_replacements,
+                    "rescued_tokens": inference_diagnostics.rescued_tokens,
+                }
             return result
 
         pred_ids = decode_document(word_log_probs, decoder=self.decoder, schema=self.schema)
@@ -392,6 +471,13 @@ class MediaSourcesPipeline:
                 "token_scores": token_scores,
                 "entities": entities,
                 "summary": summary,
+                "inference_diagnostics": {
+                    "annotation_tokens": inference_diagnostics.annotation_tokens,
+                    "model_chunks": inference_diagnostics.model_chunks,
+                    "overlapping_annotation_tokens": inference_diagnostics.overlapping_annotation_tokens,
+                    "overlap_replacements": inference_diagnostics.overlap_replacements,
+                    "rescued_tokens": inference_diagnostics.rescued_tokens,
+                },
             }
         return {"entities": entities, "summary": summary}
 
@@ -406,74 +492,172 @@ class MediaSourcesPipeline:
         ]
 
     def _word_log_probs(self, tokens: Sequence[str]) -> list[list[list[float]]]:
-        return self._word_log_probs_many([tokens], batch_size=1)[0]
+        return self._word_log_probs_many([tokens], batch_size=1).word_log_probs_by_doc[0]
 
     def _word_log_probs_many(
         self,
         tokens_by_doc: Sequence[Sequence[str]],
         *,
         batch_size: int,
-    ) -> list[list[list[list[float]]]]:
-        """Run flattened windows from many documents through the model in batches."""
+    ) -> WordLogProbResults:
+        """Run tokenizer-native overflow chunks through the model in batches."""
         import torch
 
         if batch_size <= 0:
             raise ValueError("batch_size must be positive")
 
-        # Flatten windows while retaining enough metadata to restore document/token
-        # positions. As before, overlapping tokens use the first window that covers
-        # them, preserving the existing inference semantics.
-        flat_windows: list[tuple[int, int, Window]] = []
-        for doc_index, tokens in enumerate(tokens_by_doc):
-            for window_index, window in enumerate(
-                make_windows(tokens, max_annotation_tokens=self.max_annotation_tokens, stride=self.stride)
-            ):
-                flat_windows.append((doc_index, window_index, window))
-
         word_log_probs: list[list[list[list[float]] | None]] = [
             [None for _ in tokens] for tokens in tokens_by_doc
         ]
-        word_source_window: list[list[int | None]] = [
-            [None for _ in tokens] for tokens in tokens_by_doc
-        ]
+        model_chunks_by_doc = [0 for _tokens in tokens_by_doc]
+        overlapping_annotation_tokens_by_doc = [0 for _tokens in tokens_by_doc]
+        overlap_replacements_by_doc = [0 for _tokens in tokens_by_doc]
 
-        with torch.no_grad():
-            for batch_start in range(0, len(flat_windows), batch_size):
-                batch = flat_windows[batch_start : batch_start + batch_size]
-                batch_tokens = [window.tokens for _doc_index, _window_index, window in batch]
-                encoding = self.tokenizer(
-                    batch_tokens,
-                    is_split_into_words=True,
-                    padding=True,
-                    truncation=True,
-                    max_length=self.max_sequence_len,
-                    return_offsets_mapping=False,
-                    return_tensors="pt",
+        def encode_documents(
+            document_indexes: Sequence[int],
+            token_batches: Sequence[Sequence[str]],
+            base_token_indexes: Sequence[int],
+        ) -> tuple[Any, list[int], list[int]]:
+            encoding = self.tokenizer(
+                [list(tokens) for tokens in token_batches],
+                is_split_into_words=True,
+                padding=True,
+                truncation=True,
+                max_length=self.max_sequence_len,
+                stride=self.stride,
+                return_overflowing_tokens=True,
+                return_offsets_mapping=False,
+                return_tensors="pt",
+            )
+            sample_mapping = encoding.get("overflow_to_sample_mapping")
+            if sample_mapping is None:
+                mapped_samples = list(range(len(token_batches)))
+            elif hasattr(sample_mapping, "detach"):
+                mapped_samples = [int(index) for index in sample_mapping.detach().cpu().tolist()]
+            else:
+                mapped_samples = [int(index) for index in sample_mapping]
+            return (
+                encoding,
+                [document_indexes[sample_index] for sample_index in mapped_samples],
+                [base_token_indexes[sample_index] for sample_index in mapped_samples],
+            )
+
+        def encoding_length(encoding: dict[str, Any], chunk_count: int) -> int:
+            input_ids = encoding.get("input_ids")
+            if hasattr(input_ids, "shape"):
+                return int(input_ids.shape[0])
+            return chunk_count
+
+        def slice_encoding(encoding: dict[str, Any], start: int, stop: int, chunk_count: int) -> dict[str, Any]:
+            sliced: dict[str, Any] = {}
+            for key, value in encoding.items():
+                if hasattr(value, "shape") and len(value.shape) > 0 and int(value.shape[0]) == chunk_count:
+                    sliced[key] = value[start:stop]
+                elif isinstance(value, list) and len(value) == chunk_count:
+                    sliced[key] = value[start:stop]
+                else:
+                    sliced[key] = value
+            return sliced
+
+        def process_encoding(
+            encoding: Any,
+            doc_indexes_by_chunk: Sequence[int],
+            base_token_indexes_by_chunk: Sequence[int],
+            *,
+            record_overflow: bool,
+        ) -> None:
+            chunk_count = len(doc_indexes_by_chunk)
+            if record_overflow:
+                chunks_by_doc: dict[int, list[int]] = {}
+                for chunk_index, doc_index in enumerate(doc_indexes_by_chunk):
+                    chunks_by_doc.setdefault(doc_index, []).append(chunk_index)
+                for doc_index, chunk_indexes in chunks_by_doc.items():
+                    model_chunks_by_doc[doc_index] += len(chunk_indexes)
+                    if len(chunk_indexes) <= 1:
+                        continue
+                    for overflow_index, chunk_index in enumerate(chunk_indexes[1:], start=1):
+                        word_ids = [
+                            int(word_id)
+                            for word_id in encoding.word_ids(batch_index=chunk_index)
+                            if word_id is not None
+                        ]
+                        if not word_ids:
+                            continue
+                        first_token = base_token_indexes_by_chunk[chunk_index] + min(word_ids)
+                        previous_word_ids = [
+                            int(word_id)
+                            for word_id in encoding.word_ids(batch_index=chunk_indexes[overflow_index - 1])
+                            if word_id is not None
+                        ]
+                        previous_last_token = (
+                            base_token_indexes_by_chunk[chunk_indexes[overflow_index - 1]]
+                            + max(previous_word_ids, default=min(word_ids) - 1)
+                        )
+                        overlapping_annotation_tokens_by_doc[doc_index] += max(0, previous_last_token - first_token + 1)
+
+            for batch_start in range(0, chunk_count, batch_size):
+                batch_stop = min(batch_start + batch_size, chunk_count)
+                model_inputs = self._model_inputs(
+                    slice_encoding(dict(encoding), batch_start, batch_stop, encoding_length(encoding, chunk_count))
                 )
-                model_inputs = self._model_inputs(dict(encoding))
                 outputs = self.model(**model_inputs)
                 log_probabilities = torch.log_softmax(outputs.logits.detach().cpu(), dim=-1)
                 attention_mask = model_inputs.get("attention_mask")
                 attention_values = attention_mask.detach().cpu().tolist() if attention_mask is not None else None
 
-                for batch_index, (doc_index, window_index, window) in enumerate(batch):
-                    word_ids = encoding.word_ids(batch_index=batch_index)
+                for local_batch_index, chunk_index in enumerate(range(batch_start, batch_stop)):
+                    doc_index = doc_indexes_by_chunk[chunk_index]
+                    base_token_index = base_token_indexes_by_chunk[chunk_index]
+                    word_ids = encoding.word_ids(batch_index=chunk_index)
+                    chunk_word_log_probs: dict[int, list[list[float]]] = {}
                     for subtoken_index, word_id in enumerate(word_ids):
-                        if attention_values is not None and not attention_values[batch_index][subtoken_index]:
+                        if attention_values is not None and not attention_values[local_batch_index][subtoken_index]:
                             continue
                         if word_id is None:
                             continue
-                        absolute_token = window.start_token + int(word_id)
+                        absolute_token = base_token_index + int(word_id)
                         if not 0 <= absolute_token < len(tokens_by_doc[doc_index]):
                             continue
-                        source_window = word_source_window[doc_index][absolute_token]
-                        if source_window is None:
-                            word_source_window[doc_index][absolute_token] = window_index
-                            word_log_probs[doc_index][absolute_token] = []
-                        if word_source_window[doc_index][absolute_token] == window_index:
-                            word_log_probs[doc_index][absolute_token].append(
-                                log_probabilities[batch_index, subtoken_index].tolist()
-                            )
+                        chunk_word_log_probs.setdefault(absolute_token, []).append(
+                            log_probabilities[local_batch_index, subtoken_index].tolist()
+                        )
+                    for absolute_token, token_log_probs in chunk_word_log_probs.items():
+                        existing_log_probs = word_log_probs[doc_index][absolute_token]
+                        if existing_log_probs is not None and len(token_log_probs) > len(existing_log_probs):
+                            overlap_replacements_by_doc[doc_index] += 1
+                        if existing_log_probs is None or len(token_log_probs) > len(existing_log_probs):
+                            word_log_probs[doc_index][absolute_token] = token_log_probs
+
+        with torch.no_grad():
+            nonempty_doc_indexes = [doc_index for doc_index, tokens in enumerate(tokens_by_doc) if tokens]
+            if nonempty_doc_indexes:
+                encoding, doc_indexes_by_chunk, base_token_indexes_by_chunk = encode_documents(
+                    nonempty_doc_indexes,
+                    [tokens_by_doc[doc_index] for doc_index in nonempty_doc_indexes],
+                    [0 for _doc_index in nonempty_doc_indexes],
+                )
+                process_encoding(encoding, doc_indexes_by_chunk, base_token_indexes_by_chunk, record_overflow=True)
+            rescue_specs = [
+                (doc_index, token_index, tokens[token_index])
+                for doc_index, (tokens, doc_log_probs) in enumerate(zip(tokens_by_doc, word_log_probs, strict=True))
+                for token_index, subtokens in enumerate(doc_log_probs)
+                if not subtokens
+            ]
+            rescue_tokens_by_doc: list[list[int]] = [[] for _tokens in tokens_by_doc]
+            for doc_index, token_index, _token in rescue_specs:
+                rescue_tokens_by_doc[doc_index].append(token_index)
+            if rescue_specs:
+                rescue_encoding, rescue_doc_indexes_by_chunk, rescue_base_token_indexes_by_chunk = encode_documents(
+                    [doc_index for doc_index, _token_index, _token in rescue_specs],
+                    [[token] for _doc_index, _token_index, token in rescue_specs],
+                    [token_index for _doc_index, token_index, _token in rescue_specs],
+                )
+                process_encoding(
+                    rescue_encoding,
+                    rescue_doc_indexes_by_chunk,
+                    rescue_base_token_indexes_by_chunk,
+                    record_overflow=False,
+                )
 
         out: list[list[list[list[float]]]] = []
         for doc_index, (tokens, doc_log_probs) in enumerate(zip(tokens_by_doc, word_log_probs, strict=True)):
@@ -486,12 +670,22 @@ class MediaSourcesPipeline:
                     )
                 doc_out.append(subtokens)
             out.append(doc_out)
-        return out
+        diagnostics_by_doc = [
+            DocumentWindowingDiagnostics(
+                annotation_tokens=len(tokens_by_doc[doc_index]),
+                model_chunks=model_chunks_by_doc[doc_index],
+                overlapping_annotation_tokens=overlapping_annotation_tokens_by_doc[doc_index],
+                overlap_replacements=overlap_replacements_by_doc[doc_index],
+                rescued_tokens=rescue_tokens_by_doc[doc_index],
+            )
+            for doc_index in range(len(tokens_by_doc))
+        ]
+        return WordLogProbResults(word_log_probs_by_doc=out, diagnostics_by_doc=diagnostics_by_doc)
 
     def _model_inputs(self, encoding: dict[str, Any]) -> dict[str, Any]:
         inputs = {}
         for key, value in encoding.items():
-            if key == "offset_mapping":
+            if key in {"offset_mapping", "overflow_to_sample_mapping"}:
                 continue
             if self.model_forward_parameters is not None and key not in self.model_forward_parameters:
                 continue
