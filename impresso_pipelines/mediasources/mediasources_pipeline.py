@@ -20,7 +20,7 @@ from .decoding import (
     decode_document,
     semantic_label_probability,
 )
-from .config import LABEL_WKDATA_QIDS
+from .config import LABEL_START_YEARS, LABEL_WKDATA_QIDS
 
 
 logger = logging.getLogger(__name__)
@@ -95,6 +95,15 @@ def normalize_id2label(id2label: dict[Any, str] | list[str]) -> dict[int, str]:
     return {int(index): str(label) for index, label in id2label.items()}
 
 
+def publication_year(publication_date: str | int | None) -> int | None:
+    if publication_date is None:
+        return None
+    if isinstance(publication_date, int):
+        return publication_date
+    match = re.search(r"\d{4}", str(publication_date))
+    return int(match.group(0)) if match else None
+
+
 def load_tokenizer(
     model: str,
     *,
@@ -151,8 +160,11 @@ def bio_labels_to_entities(
     text: str,
     token_scores: Sequence[float],
     wkdata_qids: dict[str, str | None],
+    label_start_years: dict[str, int],
     *,
     min_score: float | None = None,
+    publication_year: int | None = None,
+    filter_anachronistic: bool = False,
 ) -> list[dict[str, Any]]:
     entities: list[dict[str, Any]] = []
     active_start: int | None = None
@@ -167,12 +179,21 @@ def bio_labels_to_entities(
             return
         span_scores = token_scores[active_token_start:active_token_stop]
         score = float(sum(span_scores) / len(span_scores)) if span_scores else 0.0
+        start_year = label_start_years.get(active_label)
+        if filter_anachronistic and publication_year is not None and start_year is not None and start_year > publication_year:
+            active_start = None
+            active_stop = None
+            active_token_start = None
+            active_token_stop = None
+            active_label = ""
+            return
         if min_score is None or score >= min_score:
             entities.append(
                 {
                     "surface": text[active_start:active_stop],
                     "label": active_label,
                     "wkdata_qid": wkdata_qids.get(active_label),
+                    "start_year": start_year,
                     "start": active_start,
                     "stop": active_stop,
                     "score": score,
@@ -219,6 +240,7 @@ class MediaSourcesPipeline:
         max_sequence_len: int | None = None,
         max_annotation_tokens: int | None = None,
         stride: int | None = None,
+        filter_anachronistic: bool = False,
         local_files_only: bool = False,
         trust_remote_code: bool = True,
     ) -> None:
@@ -226,6 +248,7 @@ class MediaSourcesPipeline:
         self.revision = revision
         self.default_min_score = min_score
         self.default_batch_size = batch_size
+        self.default_filter_anachronistic = filter_anachronistic
         self.device = self._resolve_device(device)
 
         if isinstance(model, str):
@@ -252,6 +275,7 @@ class MediaSourcesPipeline:
         self.id2label = normalize_id2label(self.model.config.id2label)
         self.schema = compile_bio_schema(self.id2label)
         self.wkdata_qids = dict(LABEL_WKDATA_QIDS)
+        self.label_start_years = dict(LABEL_START_YEARS)
         self.model_forward_parameters = self._model_forward_parameters()
         self.decoder = decoder or self._model_protocol_value("subtoken_decoding", "decoder") or DECODER_FIRST_SUBTOKEN_VITERBI
         if self.decoder not in DECODER_CHOICES:
@@ -337,6 +361,8 @@ class MediaSourcesPipeline:
         *,
         min_score: float | None = None,
         batch_size: int | None = None,
+        publication_date: str | int | None = None,
+        filter_anachronistic: bool | None = None,
         diagnostics: bool = False,
     ) -> dict[str, Any] | list[dict[str, Any]]:
         single = isinstance(input_texts, str)
@@ -345,6 +371,8 @@ class MediaSourcesPipeline:
             texts,
             min_score=min_score,
             batch_size=batch_size,
+            publication_dates=publication_date,
+            filter_anachronistic=filter_anachronistic,
             diagnostics=diagnostics,
         )
         return outputs[0] if single else outputs
@@ -355,6 +383,8 @@ class MediaSourcesPipeline:
         *,
         min_score: float | None = None,
         batch_size: int | None = None,
+        publication_dates: str | int | Sequence[str | int | None] | None = None,
+        filter_anachronistic: bool | None = None,
         diagnostics: bool = False,
     ) -> list[dict[str, Any]]:
         """Predict documents while batching model inference across annotation windows."""
@@ -364,8 +394,17 @@ class MediaSourcesPipeline:
 
         effective_min_score = self.default_min_score if min_score is None else min_score
         effective_batch_size = self.default_batch_size if batch_size is None else batch_size
+        effective_filter_anachronistic = (
+            self.default_filter_anachronistic if filter_anachronistic is None else filter_anachronistic
+        )
         if effective_batch_size <= 0:
             raise ValueError("batch_size must be positive")
+        if isinstance(publication_dates, Sequence) and not isinstance(publication_dates, str):
+            if len(publication_dates) != len(texts):
+                raise ValueError("publication_dates must have the same length as texts")
+            publication_years = [publication_year(date) for date in publication_dates]
+        else:
+            publication_years = [publication_year(publication_dates) for _text in texts]
 
         tokenized = [tokenize_with_offsets(text) for text in texts]
         tokens_by_doc = [tokens for tokens, _starts, _stops in tokenized]
@@ -382,22 +421,40 @@ class MediaSourcesPipeline:
                 stops,
                 word_log_probs,
                 inference_diagnostics,
+                publication_year_value,
                 min_score=effective_min_score,
+                filter_anachronistic=effective_filter_anachronistic,
                 diagnostics=diagnostics,
             )
-            for text, (tokens, starts, stops), word_log_probs, inference_diagnostics in zip(
+            for text, (tokens, starts, stops), word_log_probs, inference_diagnostics, publication_year_value in zip(
                 texts,
                 tokenized,
                 word_log_prob_results.word_log_probs_by_doc,
                 word_log_prob_results.diagnostics_by_doc,
+                publication_years,
                 strict=True,
             )
         ]
         self._log_entity_stats(results)
         return results
 
-    def predict_one(self, text: str, *, min_score: float | None = None, diagnostics: bool = False) -> dict[str, Any]:
-        return self.predict_many([text], min_score=min_score, batch_size=1, diagnostics=diagnostics)[0]
+    def predict_one(
+        self,
+        text: str,
+        *,
+        min_score: float | None = None,
+        publication_date: str | int | None = None,
+        filter_anachronistic: bool | None = None,
+        diagnostics: bool = False,
+    ) -> dict[str, Any]:
+        return self.predict_many(
+            [text],
+            min_score=min_score,
+            batch_size=1,
+            publication_dates=publication_date,
+            filter_anachronistic=filter_anachronistic,
+            diagnostics=diagnostics,
+        )[0]
 
     def _log_entity_stats(self, results: Sequence[dict[str, Any]]) -> None:
         entity_counts = Counter(
@@ -428,8 +485,10 @@ class MediaSourcesPipeline:
         stops: Sequence[int],
         word_log_probs: Sequence[Sequence[Sequence[float]]],
         inference_diagnostics: DocumentWindowingDiagnostics,
+        publication_year_value: int | None,
         *,
         min_score: float | None,
+        filter_anachronistic: bool,
         diagnostics: bool,
     ) -> dict[str, Any]:
         if not tokens:
@@ -458,7 +517,10 @@ class MediaSourcesPipeline:
             text,
             token_scores,
             self.wkdata_qids,
+            self.label_start_years,
             min_score=min_score,
+            publication_year=publication_year_value,
+            filter_anachronistic=filter_anachronistic,
         )
         summary = self._summary(entities)
         if diagnostics:

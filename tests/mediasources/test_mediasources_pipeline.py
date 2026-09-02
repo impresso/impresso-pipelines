@@ -7,6 +7,7 @@ import pytest
 import torch
 
 from impresso_pipelines.mediasources import mediasources_pipeline as mediasources_module
+from impresso_pipelines.mediasources.config import LABEL_START_YEARS, LABEL_WKDATA_QIDS
 from impresso_pipelines.mediasources.mediasources_pipeline import MediaSourcesPipeline, load_tokenizer, tokenize_with_offsets
 from impresso_pipelines.newsagencies import NewsAgenciesPipeline
 
@@ -17,6 +18,15 @@ ID2LABEL = {
     2: "I-org.ent.pressagency.reuters",
     3: "B-org.ent.radiostation.bbc",
     4: "I-org.ent.radiostation.bbc",
+}
+
+EXPECTED_MISSING_QIDS = {
+    "org.ent.pressagency.agence-radio",
+    "org.ent.pressagency.akp",
+    "org.ent.pressagency.cip",
+    "org.ent.pressagency.keystone",
+    "org.ent.pressagency.kipa",
+    "org.ent.pressagency.telegraphen-union",
 }
 
 
@@ -245,6 +255,18 @@ def test_tokenizer_matches_model_protocol() -> None:
     ] == tokens
 
 
+def test_media_source_qid_and_start_year_mappings_have_same_labels() -> None:
+    assert set(LABEL_START_YEARS) == set(LABEL_WKDATA_QIDS)
+
+
+def test_all_media_source_labels_have_start_years() -> None:
+    assert {label for label, year in LABEL_START_YEARS.items() if year is None} == set()
+
+
+def test_missing_qids_are_explicitly_tracked() -> None:
+    assert {label for label, qid in LABEL_WKDATA_QIDS.items() if qid is None} == EXPECTED_MISSING_QIDS
+
+
 def test_media_sources_pipeline_is_separate_from_legacy_newsagencies_pipeline() -> None:
     assert MediaSourcesPipeline is not NewsAgenciesPipeline
 
@@ -266,6 +288,7 @@ def test_diagnostics_return_decoded_entities_with_exact_offsets() -> None:
         {
             "label": "org.ent.radiostation.bbc",
             "wkdata_qid": "Q9531",
+            "start_year": 1922,
             "start": 4,
             "stop": 21,
             "surface": "BBC World Service",
@@ -295,6 +318,7 @@ def test_score_marginalizes_over_bio_state_for_decoded_entity() -> None:
     assert result["entities"][0]["score"] == pytest.approx(result["token_scores"][0])
     assert result["entities"][0]["score"] > 0.98
     assert result["entities"][0]["wkdata_qid"] == "Q130879"
+    assert result["entities"][0]["start_year"] == 1851
     assert result["summary"] == [
         {
             "uid": "org.ent.pressagency.reuters",
@@ -320,6 +344,36 @@ def test_min_score_filters_only_after_decoding_and_entity_scoring() -> None:
     assert filtered["token_labels"] == ["B-org.ent.pressagency.reuters"]
     assert filtered["entities"] == []
     assert filtered["summary"] == []
+
+
+def test_anachronistic_filter_drops_entities_after_publication_year() -> None:
+    pipe = make_pipeline({"Reuters": 1, "BBC": 3})
+
+    result = pipe(
+        ["Reuters said.", "BBC said."],
+        publication_date=["1920-01-01", "1920-01-01"],
+        filter_anachronistic=True,
+        diagnostics=True,
+    )
+
+    assert result[0]["entities"][0]["label"] == "org.ent.pressagency.reuters"
+    assert result[1]["entities"] == []
+    assert result[1]["summary"] == []
+
+
+def test_anachronistic_filter_is_inactive_without_publication_date() -> None:
+    pipe = make_pipeline({"BBC": 3})
+
+    result = pipe("BBC said.", filter_anachronistic=True)
+
+    assert result["entities"][0]["label"] == "org.ent.radiostation.bbc"
+
+
+def test_publication_dates_must_match_batch_length() -> None:
+    pipe = make_pipeline({})
+
+    with pytest.raises(ValueError, match="publication_dates must have the same length"):
+        pipe.predict_many(["a", "b"], publication_dates=["1930"])
 
 
 def test_default_stride_is_48_subtokens() -> None:
@@ -588,6 +642,7 @@ def test_unlinked_known_entity_gets_null_wkdata_qid() -> None:
         {
             "label": "org.ent.pressagency.agence-radio",
             "wkdata_qid": None,
+            "start_year": 1918,
             "start": 0,
             "stop": 12,
             "surface": "Agence Radio",
