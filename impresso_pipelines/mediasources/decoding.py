@@ -27,6 +27,7 @@ class BioDecoderSchema:
     entity_names: tuple[str, ...]
     b_ids: tuple[int, ...]
     i_ids: tuple[int, ...]
+    bio_pairs: tuple[tuple[int, int], ...]
     i_id_by_b_id: tuple[int, ...]
     is_b_by_id: tuple[bool, ...]
     is_i_by_id: tuple[bool, ...]
@@ -106,6 +107,7 @@ def compile_bio_schema(id2label: dict[int, str]) -> BioDecoderSchema:
         entity_names=entity_names,
         b_ids=tuple(b_by_entity[entity_name] for entity_name in entity_names),
         i_ids=tuple(i_by_entity[entity_name] for entity_name in entity_names),
+        bio_pairs=tuple((b_by_entity[entity_name], i_by_entity[entity_name]) for entity_name in entity_names),
         i_id_by_b_id=tuple(i_id_by_b_id),
         is_b_by_id=tuple(is_b_by_id),
         is_i_by_id=tuple(is_i_by_id),
@@ -214,19 +216,36 @@ def decode_bio_viterbi_reference(emissions: Sequence[Sequence[float]], id2label:
 def top_three_state_ids(scores: Sequence[float]) -> tuple[int, int, int]:
     # Ties intentionally keep the lowest state ID, matching the reference Viterbi
     # implementation's ascending predecessor scan and Python max() first-wins behavior.
-    if len(scores) < 3:
+    score_count = len(scores)
+    if score_count < 3:
         raise ValueError("BIO top-three predecessor search requires at least three labels")
-    best_ids = [0, 1, 2]
-    best_ids.sort(key=lambda state_id: (-float(scores[state_id]), state_id))
-    for state_id in range(3, len(scores)):
-        score = float(scores[state_id])
-        if score > float(scores[best_ids[0]]):
-            best_ids = [state_id, best_ids[0], best_ids[1]]
-        elif score > float(scores[best_ids[1]]):
-            best_ids = [best_ids[0], state_id, best_ids[1]]
-        elif score > float(scores[best_ids[2]]):
-            best_ids[2] = state_id
-    return best_ids[0], best_ids[1], best_ids[2]
+    id0 = 0
+    id1 = 1
+    id2 = 2
+    score0 = scores[0]
+    score1 = scores[1]
+    score2 = scores[2]
+    if score1 > score0:
+        id0, id1 = id1, id0
+        score0, score1 = score1, score0
+    if score2 > score1:
+        id1, id2 = id2, id1
+        score1, score2 = score2, score1
+        if score1 > score0:
+            id0, id1 = id1, id0
+            score0, score1 = score1, score0
+    for state_id in range(3, score_count):
+        score = scores[state_id]
+        if score > score0:
+            id2, score2 = id1, score1
+            id1, score1 = id0, score0
+            id0, score0 = state_id, score
+        elif score > score1:
+            id2, score2 = id1, score1
+            id1, score1 = state_id, score
+        elif score > score2:
+            id2, score2 = state_id, score
+    return id0, id1, id2
 
 
 def best_predecessor_excluding_pair(
@@ -253,8 +272,7 @@ def viterbi_decode_with_schema(
         return _viterbi_decode_with_schema_list_backpointers(emissions, schema)
 
     o_id = schema.o_id
-    b_ids = schema.b_ids
-    i_ids = schema.i_ids
+    bio_pairs = schema.bio_pairs
     is_i_by_id = schema.is_i_by_id
     previous_scores = [NEG_INF] * label_count
     current_scores = [NEG_INF] * label_count
@@ -270,29 +288,34 @@ def viterbi_decode_with_schema(
     backpointers = bytearray((emissions_count - 1) * label_count)
     for position in range(1, emissions_count):
         row = emissions[position]
-        top_three_ids = top_three_state_ids(previous_scores)
-        best_id = top_three_ids[0]
+        top0, top1, top2 = top_three_state_ids(previous_scores)
         backpointer_offset = (position - 1) * label_count
 
-        current_scores[o_id] = float(row[o_id]) + previous_scores[best_id]
-        backpointers[backpointer_offset + o_id] = best_id
+        current_scores[o_id] = float(row[o_id]) + previous_scores[top0]
+        backpointers[backpointer_offset + o_id] = top0
 
-        for b_id, i_id in zip(b_ids, i_ids, strict=True):
-            b_predecessor = best_predecessor_excluding_pair(
-                top_three_ids,
-                excluded_first=b_id,
-                excluded_second=i_id,
-            )
+        for b_id, i_id in bio_pairs:
+            if top0 != b_id and top0 != i_id:
+                b_predecessor = top0
+            elif top1 != b_id and top1 != i_id:
+                b_predecessor = top1
+            else:
+                b_predecessor = top2
             current_scores[b_id] = float(row[b_id]) + previous_scores[b_predecessor]
             backpointers[backpointer_offset + b_id] = b_predecessor
 
-            if previous_scores[b_id] > previous_scores[i_id]:
+            b_score = previous_scores[b_id]
+            i_score = previous_scores[i_id]
+            if b_score > i_score:
                 i_predecessor = b_id
-            elif previous_scores[i_id] > previous_scores[b_id]:
+                i_score_value = b_score
+            elif i_score > b_score:
                 i_predecessor = i_id
+                i_score_value = i_score
             else:
-                i_predecessor = min(b_id, i_id)
-            current_scores[i_id] = float(row[i_id]) + previous_scores[i_predecessor]
+                i_predecessor = b_id if b_id < i_id else i_id
+                i_score_value = b_score
+            current_scores[i_id] = float(row[i_id]) + i_score_value
             backpointers[backpointer_offset + i_id] = i_predecessor
 
         previous_scores, current_scores = current_scores, previous_scores
@@ -314,8 +337,7 @@ def _viterbi_decode_with_schema_list_backpointers(
         return []
     label_count = schema.label_count
     o_id = schema.o_id
-    b_ids = schema.b_ids
-    i_ids = schema.i_ids
+    bio_pairs = schema.bio_pairs
     is_i_by_id = schema.is_i_by_id
     previous_scores = [NEG_INF] * label_count
     current_scores = [NEG_INF] * label_count
@@ -331,29 +353,34 @@ def _viterbi_decode_with_schema_list_backpointers(
     backpointers = [0] * ((emissions_count - 1) * label_count)
     for position in range(1, emissions_count):
         row = emissions[position]
-        top_three_ids = top_three_state_ids(previous_scores)
-        best_id = top_three_ids[0]
+        top0, top1, top2 = top_three_state_ids(previous_scores)
         backpointer_offset = (position - 1) * label_count
 
-        current_scores[o_id] = float(row[o_id]) + previous_scores[best_id]
-        backpointers[backpointer_offset + o_id] = best_id
+        current_scores[o_id] = float(row[o_id]) + previous_scores[top0]
+        backpointers[backpointer_offset + o_id] = top0
 
-        for b_id, i_id in zip(b_ids, i_ids, strict=True):
-            b_predecessor = best_predecessor_excluding_pair(
-                top_three_ids,
-                excluded_first=b_id,
-                excluded_second=i_id,
-            )
+        for b_id, i_id in bio_pairs:
+            if top0 != b_id and top0 != i_id:
+                b_predecessor = top0
+            elif top1 != b_id and top1 != i_id:
+                b_predecessor = top1
+            else:
+                b_predecessor = top2
             current_scores[b_id] = float(row[b_id]) + previous_scores[b_predecessor]
             backpointers[backpointer_offset + b_id] = b_predecessor
 
-            if previous_scores[b_id] > previous_scores[i_id]:
+            b_score = previous_scores[b_id]
+            i_score = previous_scores[i_id]
+            if b_score > i_score:
                 i_predecessor = b_id
-            elif previous_scores[i_id] > previous_scores[b_id]:
+                i_score_value = b_score
+            elif i_score > b_score:
                 i_predecessor = i_id
+                i_score_value = i_score
             else:
-                i_predecessor = min(b_id, i_id)
-            current_scores[i_id] = float(row[i_id]) + previous_scores[i_predecessor]
+                i_predecessor = b_id if b_id < i_id else i_id
+                i_score_value = b_score
+            current_scores[i_id] = float(row[i_id]) + i_score_value
             backpointers[backpointer_offset + i_id] = i_predecessor
 
         previous_scores, current_scores = current_scores, previous_scores
@@ -371,6 +398,151 @@ def viterbi_decode(emissions: Sequence[Sequence[float]], id2label: dict[int, str
     return viterbi_decode_with_schema(emissions, compile_bio_schema(id2label))
 
 
+def viterbi_decode_first_subtoken_with_schema(
+    word_subtoken_log_probs: Sequence[Sequence[Sequence[float]]],
+    schema: BioDecoderSchema,
+) -> list[int]:
+    if not word_subtoken_log_probs:
+        return []
+    label_count = schema.label_count
+    if label_count > 256:
+        return _viterbi_decode_first_subtoken_with_schema_list_backpointers(word_subtoken_log_probs, schema)
+
+    o_id = schema.o_id
+    bio_pairs = schema.bio_pairs
+    is_i_by_id = schema.is_i_by_id
+    previous_scores = [NEG_INF] * label_count
+    current_scores = [NEG_INF] * label_count
+
+    first_subtokens = word_subtoken_log_probs[0]
+    if not first_subtokens:
+        raise ValueError("cannot decode word without subtoken probabilities")
+    first_row = first_subtokens[0]
+    for label_id in range(label_count):
+        if is_i_by_id[label_id]:
+            previous_scores[label_id] = NEG_INF
+        else:
+            previous_scores[label_id] = float(first_row[label_id])
+
+    token_count = len(word_subtoken_log_probs)
+    backpointers = bytearray((token_count - 1) * label_count)
+    for position in range(1, token_count):
+        subtokens = word_subtoken_log_probs[position]
+        if not subtokens:
+            raise ValueError("cannot decode word without subtoken probabilities")
+        row = subtokens[0]
+        top0, top1, top2 = top_three_state_ids(previous_scores)
+        backpointer_offset = (position - 1) * label_count
+
+        current_scores[o_id] = float(row[o_id]) + previous_scores[top0]
+        backpointers[backpointer_offset + o_id] = top0
+
+        for b_id, i_id in bio_pairs:
+            if top0 != b_id and top0 != i_id:
+                b_predecessor = top0
+            elif top1 != b_id and top1 != i_id:
+                b_predecessor = top1
+            else:
+                b_predecessor = top2
+            current_scores[b_id] = float(row[b_id]) + previous_scores[b_predecessor]
+            backpointers[backpointer_offset + b_id] = b_predecessor
+
+            b_score = previous_scores[b_id]
+            i_score = previous_scores[i_id]
+            if b_score > i_score:
+                i_predecessor = b_id
+                i_score_value = b_score
+            elif i_score > b_score:
+                i_predecessor = i_id
+                i_score_value = i_score
+            else:
+                i_predecessor = b_id if b_id < i_id else i_id
+                i_score_value = b_score
+            current_scores[i_id] = float(row[i_id]) + i_score_value
+            backpointers[backpointer_offset + i_id] = i_predecessor
+
+        previous_scores, current_scores = current_scores, previous_scores
+
+    best_state = max(range(label_count), key=lambda index: previous_scores[index])
+    states = [0] * token_count
+    states[-1] = best_state
+    for position in range(token_count - 2, -1, -1):
+        best_state = backpointers[position * label_count + best_state]
+        states[position] = best_state
+    return states
+
+
+def _viterbi_decode_first_subtoken_with_schema_list_backpointers(
+    word_subtoken_log_probs: Sequence[Sequence[Sequence[float]]],
+    schema: BioDecoderSchema,
+) -> list[int]:
+    if not word_subtoken_log_probs:
+        return []
+    label_count = schema.label_count
+    o_id = schema.o_id
+    bio_pairs = schema.bio_pairs
+    is_i_by_id = schema.is_i_by_id
+    previous_scores = [NEG_INF] * label_count
+    current_scores = [NEG_INF] * label_count
+
+    first_subtokens = word_subtoken_log_probs[0]
+    if not first_subtokens:
+        raise ValueError("cannot decode word without subtoken probabilities")
+    first_row = first_subtokens[0]
+    for label_id in range(label_count):
+        if is_i_by_id[label_id]:
+            previous_scores[label_id] = NEG_INF
+        else:
+            previous_scores[label_id] = float(first_row[label_id])
+
+    token_count = len(word_subtoken_log_probs)
+    backpointers = [0] * ((token_count - 1) * label_count)
+    for position in range(1, token_count):
+        subtokens = word_subtoken_log_probs[position]
+        if not subtokens:
+            raise ValueError("cannot decode word without subtoken probabilities")
+        row = subtokens[0]
+        top0, top1, top2 = top_three_state_ids(previous_scores)
+        backpointer_offset = (position - 1) * label_count
+
+        current_scores[o_id] = float(row[o_id]) + previous_scores[top0]
+        backpointers[backpointer_offset + o_id] = top0
+
+        for b_id, i_id in bio_pairs:
+            if top0 != b_id and top0 != i_id:
+                b_predecessor = top0
+            elif top1 != b_id and top1 != i_id:
+                b_predecessor = top1
+            else:
+                b_predecessor = top2
+            current_scores[b_id] = float(row[b_id]) + previous_scores[b_predecessor]
+            backpointers[backpointer_offset + b_id] = b_predecessor
+
+            b_score = previous_scores[b_id]
+            i_score = previous_scores[i_id]
+            if b_score > i_score:
+                i_predecessor = b_id
+                i_score_value = b_score
+            elif i_score > b_score:
+                i_predecessor = i_id
+                i_score_value = i_score
+            else:
+                i_predecessor = b_id if b_id < i_id else i_id
+                i_score_value = b_score
+            current_scores[i_id] = float(row[i_id]) + i_score_value
+            backpointers[backpointer_offset + i_id] = i_predecessor
+
+        previous_scores, current_scores = current_scores, previous_scores
+
+    best_state = max(range(label_count), key=lambda index: previous_scores[index])
+    states = [0] * token_count
+    states[-1] = best_state
+    for position in range(token_count - 2, -1, -1):
+        best_state = backpointers[position * label_count + best_state]
+        states[position] = best_state
+    return states
+
+
 def decode_document(
     word_subtoken_log_probs: Sequence[Sequence[Sequence[float]]],
     *,
@@ -385,7 +557,7 @@ def decode_document(
             raise ValueError("all-subtoken decoding requires id2label or schema")
         schema = compile_bio_schema(id2label)
     if decoder == DECODER_FIRST_SUBTOKEN_VITERBI:
-        return viterbi_decode_with_schema(first_subtoken_emissions(word_subtoken_log_probs), schema)
+        return viterbi_decode_first_subtoken_with_schema(word_subtoken_log_probs, schema)
     if decoder == DECODER_ALL_SUBTOKEN:
         return argmax_decode(all_subtoken_emissions(word_subtoken_log_probs, schema))
     if decoder == DECODER_ALL_SUBTOKEN_VITERBI:
@@ -408,9 +580,8 @@ def decode_document_timed(
             raise ValueError("all-subtoken decoding requires id2label or schema")
         schema = compile_bio_schema(id2label)
     if decoder == DECODER_FIRST_SUBTOKEN_VITERBI:
-        emissions = first_subtoken_emissions(word_subtoken_log_probs)
         started = time.perf_counter()
-        result = viterbi_decode_with_schema(emissions, schema)
+        result = viterbi_decode_first_subtoken_with_schema(word_subtoken_log_probs, schema)
         return result, time.perf_counter() - started
     if decoder == DECODER_ALL_SUBTOKEN:
         return argmax_decode(all_subtoken_emissions(word_subtoken_log_probs, schema)), 0.0
