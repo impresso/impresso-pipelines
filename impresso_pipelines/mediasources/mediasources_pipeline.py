@@ -18,7 +18,7 @@ from .decoding import (
     DECODER_CHOICES,
     DECODER_FIRST_SUBTOKEN_VITERBI,
     compile_bio_schema,
-    decode_document,
+    decode_document_timed,
     semantic_label_probability,
 )
 from .config import LABEL_START_YEARS, LABEL_WKDATA_QIDS
@@ -425,6 +425,8 @@ class MediaSourcesPipeline:
                 "logits_to_cpu_seconds": 0.0,
                 "reconstruction_seconds": 0.0,
                 "decode_seconds": 0.0,
+                "viterbi_seconds": 0.0,
+                "postprocess_seconds": 0.0,
                 "pipeline_seconds": 0.0,
             }
             return []
@@ -456,8 +458,17 @@ class MediaSourcesPipeline:
         inference_seconds = time.perf_counter() - inference_started
 
         decode_started = time.perf_counter()
-        results = [
-            self._decode_result(
+        viterbi_seconds = 0.0
+        results = []
+        for text, (tokens, starts, stops), word_log_probs, inference_diagnostics, publication_year_value in zip(
+            texts,
+            tokenized,
+            word_log_prob_results.word_log_probs_by_doc,
+            word_log_prob_results.diagnostics_by_doc,
+            publication_years,
+            strict=True,
+        ):
+            result, document_viterbi_seconds = self._decode_result(
                 text,
                 tokens,
                 starts,
@@ -469,16 +480,10 @@ class MediaSourcesPipeline:
                 filter_anachronistic=effective_filter_anachronistic,
                 diagnostics=diagnostics,
             )
-            for text, (tokens, starts, stops), word_log_probs, inference_diagnostics, publication_year_value in zip(
-                texts,
-                tokenized,
-                word_log_prob_results.word_log_probs_by_doc,
-                word_log_prob_results.diagnostics_by_doc,
-                publication_years,
-                strict=True,
-            )
-        ]
+            results.append(result)
+            viterbi_seconds += document_viterbi_seconds
         decode_seconds = time.perf_counter() - decode_started
+        postprocess_seconds = max(0.0, decode_seconds - viterbi_seconds)
         pipeline_seconds = time.perf_counter() - pipeline_started
         self.last_inference_stats = {
             **word_log_prob_results.stats,
@@ -487,6 +492,8 @@ class MediaSourcesPipeline:
             "tokenize_seconds": tokenize_seconds,
             "inference_seconds": inference_seconds,
             "decode_seconds": decode_seconds,
+            "viterbi_seconds": viterbi_seconds,
+            "postprocess_seconds": postprocess_seconds,
             "pipeline_seconds": pipeline_seconds,
         }
         self._log_entity_stats(results)
@@ -544,7 +551,7 @@ class MediaSourcesPipeline:
         min_score: float | None,
         filter_anachronistic: bool,
         diagnostics: bool,
-    ) -> dict[str, Any]:
+    ) -> tuple[dict[str, Any], float]:
         if not tokens:
             result: dict[str, Any] = {"entities": [], "summary": []}
             if diagnostics:
@@ -556,9 +563,9 @@ class MediaSourcesPipeline:
                     "overlap_replacements": inference_diagnostics.overlap_replacements,
                     "rescued_tokens": inference_diagnostics.rescued_tokens,
                 }
-            return result
+            return result, 0.0
 
-        pred_ids = decode_document(word_log_probs, decoder=self.decoder, schema=self.schema)
+        pred_ids, viterbi_seconds = decode_document_timed(word_log_probs, decoder=self.decoder, schema=self.schema)
         labels = [self.id2label[int(label_id)] for label_id in pred_ids]
         token_scores = [
             semantic_label_probability(subtokens[0], int(label_id), self.schema)
@@ -594,8 +601,8 @@ class MediaSourcesPipeline:
                     "overlap_replacements": inference_diagnostics.overlap_replacements,
                     "rescued_tokens": inference_diagnostics.rescued_tokens,
                 },
-            }
-        return {"entities": entities, "summary": summary}
+            }, viterbi_seconds
+        return {"entities": entities, "summary": summary}, viterbi_seconds
 
     def _summary(self, entities: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
         best: dict[str, float] = {}

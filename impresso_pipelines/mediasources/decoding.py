@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -235,7 +236,7 @@ def best_predecessor_excluding_pair(
     excluded_second: int,
 ) -> int:
     for state_id in top_three_ids:
-        if state_id not in {excluded_first, excluded_second}:
+        if state_id != excluded_first and state_id != excluded_second:
             return state_id
     raise ValueError("could not find legal predecessor outside excluded BIO pair")
 
@@ -246,31 +247,44 @@ def viterbi_decode_with_schema(
 ) -> list[int]:
     if not emissions:
         return []
-    previous_scores = [NEG_INF] * schema.label_count
-    for label_id in range(schema.label_count):
-        if schema.is_i_by_id[label_id]:
+
+    label_count = schema.label_count
+    if label_count > 256:
+        return _viterbi_decode_with_schema_list_backpointers(emissions, schema)
+
+    o_id = schema.o_id
+    b_ids = schema.b_ids
+    i_ids = schema.i_ids
+    is_i_by_id = schema.is_i_by_id
+    previous_scores = [NEG_INF] * label_count
+    current_scores = [NEG_INF] * label_count
+
+    first_emissions = emissions[0]
+    for label_id in range(label_count):
+        if is_i_by_id[label_id]:
             previous_scores[label_id] = NEG_INF
         else:
-            previous_scores[label_id] = float(emissions[0][label_id])
+            previous_scores[label_id] = float(first_emissions[label_id])
 
-    backpointers: list[list[int]] = []
-    for position in range(1, len(emissions)):
+    emissions_count = len(emissions)
+    backpointers = bytearray((emissions_count - 1) * label_count)
+    for position in range(1, emissions_count):
+        row = emissions[position]
         top_three_ids = top_three_state_ids(previous_scores)
         best_id = top_three_ids[0]
-        current_scores = [NEG_INF] * schema.label_count
-        current_backpointers = [0] * schema.label_count
+        backpointer_offset = (position - 1) * label_count
 
-        current_scores[schema.o_id] = float(emissions[position][schema.o_id]) + previous_scores[best_id]
-        current_backpointers[schema.o_id] = best_id
+        current_scores[o_id] = float(row[o_id]) + previous_scores[best_id]
+        backpointers[backpointer_offset + o_id] = best_id
 
-        for b_id, i_id in zip(schema.b_ids, schema.i_ids, strict=True):
+        for b_id, i_id in zip(b_ids, i_ids, strict=True):
             b_predecessor = best_predecessor_excluding_pair(
                 top_three_ids,
                 excluded_first=b_id,
                 excluded_second=i_id,
             )
-            current_scores[b_id] = float(emissions[position][b_id]) + previous_scores[b_predecessor]
-            current_backpointers[b_id] = b_predecessor
+            current_scores[b_id] = float(row[b_id]) + previous_scores[b_predecessor]
+            backpointers[backpointer_offset + b_id] = b_predecessor
 
             if previous_scores[b_id] > previous_scores[i_id]:
                 i_predecessor = b_id
@@ -278,18 +292,78 @@ def viterbi_decode_with_schema(
                 i_predecessor = i_id
             else:
                 i_predecessor = min(b_id, i_id)
-            current_scores[i_id] = float(emissions[position][i_id]) + previous_scores[i_predecessor]
-            current_backpointers[i_id] = i_predecessor
+            current_scores[i_id] = float(row[i_id]) + previous_scores[i_predecessor]
+            backpointers[backpointer_offset + i_id] = i_predecessor
 
-        previous_scores = current_scores
-        backpointers.append(current_backpointers)
+        previous_scores, current_scores = current_scores, previous_scores
 
-    best_state = max(range(schema.label_count), key=lambda index: previous_scores[index])
-    states = [best_state]
-    for pointers in reversed(backpointers):
-        best_state = pointers[best_state]
-        states.append(best_state)
-    states.reverse()
+    best_state = max(range(label_count), key=lambda index: previous_scores[index])
+    states = [0] * emissions_count
+    states[-1] = best_state
+    for position in range(emissions_count - 2, -1, -1):
+        best_state = backpointers[position * label_count + best_state]
+        states[position] = best_state
+    return states
+
+
+def _viterbi_decode_with_schema_list_backpointers(
+    emissions: Sequence[Sequence[float]],
+    schema: BioDecoderSchema,
+) -> list[int]:
+    if not emissions:
+        return []
+    label_count = schema.label_count
+    o_id = schema.o_id
+    b_ids = schema.b_ids
+    i_ids = schema.i_ids
+    is_i_by_id = schema.is_i_by_id
+    previous_scores = [NEG_INF] * label_count
+    current_scores = [NEG_INF] * label_count
+
+    first_emissions = emissions[0]
+    for label_id in range(label_count):
+        if is_i_by_id[label_id]:
+            previous_scores[label_id] = NEG_INF
+        else:
+            previous_scores[label_id] = float(first_emissions[label_id])
+
+    emissions_count = len(emissions)
+    backpointers = [0] * ((emissions_count - 1) * label_count)
+    for position in range(1, emissions_count):
+        row = emissions[position]
+        top_three_ids = top_three_state_ids(previous_scores)
+        best_id = top_three_ids[0]
+        backpointer_offset = (position - 1) * label_count
+
+        current_scores[o_id] = float(row[o_id]) + previous_scores[best_id]
+        backpointers[backpointer_offset + o_id] = best_id
+
+        for b_id, i_id in zip(b_ids, i_ids, strict=True):
+            b_predecessor = best_predecessor_excluding_pair(
+                top_three_ids,
+                excluded_first=b_id,
+                excluded_second=i_id,
+            )
+            current_scores[b_id] = float(row[b_id]) + previous_scores[b_predecessor]
+            backpointers[backpointer_offset + b_id] = b_predecessor
+
+            if previous_scores[b_id] > previous_scores[i_id]:
+                i_predecessor = b_id
+            elif previous_scores[i_id] > previous_scores[b_id]:
+                i_predecessor = i_id
+            else:
+                i_predecessor = min(b_id, i_id)
+            current_scores[i_id] = float(row[i_id]) + previous_scores[i_predecessor]
+            backpointers[backpointer_offset + i_id] = i_predecessor
+
+        previous_scores, current_scores = current_scores, previous_scores
+
+    best_state = max(range(label_count), key=lambda index: previous_scores[index])
+    states = [0] * emissions_count
+    states[-1] = best_state
+    for position in range(emissions_count - 2, -1, -1):
+        best_state = backpointers[position * label_count + best_state]
+        states[position] = best_state
     return states
 
 
@@ -317,6 +391,34 @@ def decode_document(
     if decoder == DECODER_ALL_SUBTOKEN_VITERBI:
         emissions = all_subtoken_emissions(word_subtoken_log_probs, schema)
         return viterbi_decode_with_schema(emissions, schema)
+    raise ValueError(f"unsupported decoder: {decoder}")
+
+
+def decode_document_timed(
+    word_subtoken_log_probs: Sequence[Sequence[Sequence[float]]],
+    *,
+    decoder: str,
+    id2label: dict[int, str] | None = None,
+    schema: BioDecoderSchema | None = None,
+) -> tuple[list[int], float]:
+    if decoder == DECODER_FIRST_SUBTOKEN:
+        return argmax_decode(first_subtoken_emissions(word_subtoken_log_probs)), 0.0
+    if schema is None:
+        if id2label is None:
+            raise ValueError("all-subtoken decoding requires id2label or schema")
+        schema = compile_bio_schema(id2label)
+    if decoder == DECODER_FIRST_SUBTOKEN_VITERBI:
+        emissions = first_subtoken_emissions(word_subtoken_log_probs)
+        started = time.perf_counter()
+        result = viterbi_decode_with_schema(emissions, schema)
+        return result, time.perf_counter() - started
+    if decoder == DECODER_ALL_SUBTOKEN:
+        return argmax_decode(all_subtoken_emissions(word_subtoken_log_probs, schema)), 0.0
+    if decoder == DECODER_ALL_SUBTOKEN_VITERBI:
+        emissions = all_subtoken_emissions(word_subtoken_log_probs, schema)
+        started = time.perf_counter()
+        result = viterbi_decode_with_schema(emissions, schema)
+        return result, time.perf_counter() - started
     raise ValueError(f"unsupported decoder: {decoder}")
 
 
