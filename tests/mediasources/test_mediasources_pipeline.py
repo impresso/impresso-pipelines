@@ -8,7 +8,12 @@ import torch
 
 from impresso_pipelines.mediasources import mediasources_pipeline as mediasources_module
 from impresso_pipelines.mediasources.config import LABEL_START_YEARS, LABEL_WKDATA_QIDS
-from impresso_pipelines.mediasources.mediasources_pipeline import MediaSourcesPipeline, load_tokenizer, tokenize_with_offsets
+from impresso_pipelines.mediasources.mediasources_pipeline import (
+    MediaSourcesPipeline,
+    load_tokenizer,
+    tokenize_with_offsets,
+    torch_dtype,
+)
 from impresso_pipelines.newsagencies import NewsAgenciesPipeline
 
 
@@ -649,6 +654,26 @@ def test_unlinked_known_entity_gets_null_wkdata_qid() -> None:
             "score": pytest.approx(1.0),
         }
     ]
+
+
+def test_pipeline_passes_requested_dtype_to_model_loader(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+
+    def fake_model_from_pretrained(*_args, **kwargs):
+        calls.append(kwargs)
+        return FakeModel()
+
+    monkeypatch.setattr(mediasources_module.AutoModelForTokenClassification, "from_pretrained", fake_model_from_pretrained)
+    monkeypatch.setattr(mediasources_module, "load_tokenizer", lambda *_args, **_kwargs: FakeTokenizer({}))
+
+    MediaSourcesPipeline("model-id", revision="v2.0.0", dtype="float16", device=-1)
+
+    assert calls[0]["dtype"] is torch.float16
+
+
+def test_torch_dtype_rejects_unknown_dtype() -> None:
+    with pytest.raises(ValueError, match="unsupported dtype"):
+        torch_dtype("float64")
 
 
 def test_load_tokenizer_falls_back_for_tokenizers_backend_config(monkeypatch, tmp_path) -> None:

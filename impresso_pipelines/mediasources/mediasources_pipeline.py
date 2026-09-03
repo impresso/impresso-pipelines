@@ -153,6 +153,20 @@ def load_tokenizer(
     return PreTrainedTokenizerFast(tokenizer_file=tokenizer_path, **tokenizer_kwargs)
 
 
+def torch_dtype(dtype: str) -> Any:
+    import torch
+
+    dtype_map = {
+        "float32": torch.float32,
+        "float16": torch.float16,
+        "bfloat16": torch.bfloat16,
+    }
+    try:
+        return dtype_map[dtype]
+    except KeyError as exc:
+        raise ValueError(f"unsupported dtype: {dtype!r}; expected one of {sorted(dtype_map)}") from exc
+
+
 def bio_labels_to_entities(
     labels: Sequence[str],
     starts: Sequence[int],
@@ -236,6 +250,7 @@ class MediaSourcesPipeline:
         decoder: str | None = None,
         min_score: float | None = None,
         batch_size: int = 1,
+        dtype: str = "float32",
         device: str | int | None = None,
         max_sequence_len: int | None = None,
         max_annotation_tokens: int | None = None,
@@ -255,6 +270,7 @@ class MediaSourcesPipeline:
             self.model = AutoModelForTokenClassification.from_pretrained(
                 model,
                 revision=revision,
+                dtype=torch_dtype(dtype),
                 local_files_only=local_files_only,
                 trust_remote_code=trust_remote_code,
             )
