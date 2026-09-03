@@ -4,6 +4,7 @@ import json
 import inspect
 import logging
 import re
+import time
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -54,6 +55,7 @@ class DocumentWindowingDiagnostics:
 class WordLogProbResults:
     word_log_probs_by_doc: list[list[list[list[float]]]]
     diagnostics_by_doc: list[DocumentWindowingDiagnostics]
+    stats: dict[str, Any]
 
 
 def tokenize_with_offsets(text: str) -> tuple[list[str], list[int], list[int]]:
@@ -264,6 +266,7 @@ class MediaSourcesPipeline:
         self.default_min_score = min_score
         self.default_batch_size = batch_size
         self.default_filter_anachronistic = filter_anachronistic
+        self.last_inference_stats: dict[str, Any] = {}
         self.device = self._resolve_device(device)
 
         if isinstance(model, str):
@@ -406,6 +409,21 @@ class MediaSourcesPipeline:
         """Predict documents while batching model inference across annotation windows."""
         texts = [str(text) for text in texts]
         if not texts:
+            self.last_inference_stats = {
+                "documents": 0,
+                "tokens": 0,
+                "windows": 0,
+                "model_batches": 0,
+                "model_batch_windows": 0,
+                "model_batch_sizes": [],
+                "mean_windows_per_batch": 0.0,
+                "batch_fill": 0.0,
+                "tokenize_seconds": 0.0,
+                "inference_seconds": 0.0,
+                "model_forward_seconds": 0.0,
+                "decode_seconds": 0.0,
+                "pipeline_seconds": 0.0,
+            }
             return []
 
         effective_min_score = self.default_min_score if min_score is None else min_score
@@ -422,13 +440,19 @@ class MediaSourcesPipeline:
         else:
             publication_years = [publication_year(publication_dates) for _text in texts]
 
+        pipeline_started = time.perf_counter()
+        tokenize_started = time.perf_counter()
         tokenized = [tokenize_with_offsets(text) for text in texts]
+        tokenize_seconds = time.perf_counter() - tokenize_started
         tokens_by_doc = [tokens for tokens, _starts, _stops in tokenized]
+        inference_started = time.perf_counter()
         word_log_prob_results = self._word_log_probs_many(
             tokens_by_doc,
             batch_size=effective_batch_size,
         )
+        inference_seconds = time.perf_counter() - inference_started
 
+        decode_started = time.perf_counter()
         results = [
             self._decode_result(
                 text,
@@ -451,6 +475,17 @@ class MediaSourcesPipeline:
                 strict=True,
             )
         ]
+        decode_seconds = time.perf_counter() - decode_started
+        pipeline_seconds = time.perf_counter() - pipeline_started
+        self.last_inference_stats = {
+            **word_log_prob_results.stats,
+            "documents": len(texts),
+            "tokens": sum(len(tokens) for tokens in tokens_by_doc),
+            "tokenize_seconds": tokenize_seconds,
+            "inference_seconds": inference_seconds,
+            "decode_seconds": decode_seconds,
+            "pipeline_seconds": pipeline_seconds,
+        }
         self._log_entity_stats(results)
         return results
 
@@ -590,6 +625,10 @@ class MediaSourcesPipeline:
         model_chunks_by_doc = [0 for _tokens in tokens_by_doc]
         overlapping_annotation_tokens_by_doc = [0 for _tokens in tokens_by_doc]
         overlap_replacements_by_doc = [0 for _tokens in tokens_by_doc]
+        model_batches = 0
+        model_batch_windows = 0
+        model_forward_seconds = 0.0
+        model_batch_sizes: list[int] = []
 
         def encode_documents(
             document_indexes: Sequence[int],
@@ -644,6 +683,7 @@ class MediaSourcesPipeline:
             *,
             record_overflow: bool,
         ) -> None:
+            nonlocal model_batches, model_batch_windows, model_forward_seconds
             chunk_count = len(doc_indexes_by_chunk)
             if record_overflow:
                 chunks_by_doc: dict[int, list[int]] = {}
@@ -675,10 +715,16 @@ class MediaSourcesPipeline:
 
             for batch_start in range(0, chunk_count, batch_size):
                 batch_stop = min(batch_start + batch_size, chunk_count)
+                actual_batch_size = batch_stop - batch_start
                 model_inputs = self._model_inputs(
                     slice_encoding(dict(encoding), batch_start, batch_stop, encoding_length(encoding, chunk_count))
                 )
+                model_batches += 1
+                model_batch_windows += actual_batch_size
+                model_batch_sizes.append(actual_batch_size)
+                model_started = time.perf_counter()
                 outputs = self.model(**model_inputs)
+                model_forward_seconds += time.perf_counter() - model_started
                 log_probabilities = torch.log_softmax(outputs.logits.detach().cpu(), dim=-1)
                 attention_mask = model_inputs.get("attention_mask")
                 attention_values = attention_mask.detach().cpu().tolist() if attention_mask is not None else None
@@ -706,7 +752,7 @@ class MediaSourcesPipeline:
                         if existing_log_probs is None or len(token_log_probs) > len(existing_log_probs):
                             word_log_probs[doc_index][absolute_token] = token_log_probs
 
-        with torch.no_grad():
+        with torch.inference_mode():
             nonempty_doc_indexes = [doc_index for doc_index, tokens in enumerate(tokens_by_doc) if tokens]
             if nonempty_doc_indexes:
                 encoding, doc_indexes_by_chunk, base_token_indexes_by_chunk = encode_documents(
@@ -758,7 +804,20 @@ class MediaSourcesPipeline:
             )
             for doc_index in range(len(tokens_by_doc))
         ]
-        return WordLogProbResults(word_log_probs_by_doc=out, diagnostics_by_doc=diagnostics_by_doc)
+        primary_windows = sum(model_chunks_by_doc)
+        windows = model_batch_windows
+        batch_fill = (model_batch_windows / (model_batches * batch_size)) if model_batches else 0.0
+        stats = {
+            "windows": windows,
+            "primary_windows": primary_windows,
+            "model_batches": model_batches,
+            "model_batch_windows": model_batch_windows,
+            "model_batch_sizes": model_batch_sizes,
+            "mean_windows_per_batch": (model_batch_windows / model_batches) if model_batches else 0.0,
+            "batch_fill": batch_fill,
+            "model_forward_seconds": model_forward_seconds,
+        }
+        return WordLogProbResults(word_log_probs_by_doc=out, diagnostics_by_doc=diagnostics_by_doc, stats=stats)
 
     def _model_inputs(self, encoding: dict[str, Any]) -> dict[str, Any]:
         inputs = {}
