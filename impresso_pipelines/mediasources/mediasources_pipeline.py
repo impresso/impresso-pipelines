@@ -420,7 +420,10 @@ class MediaSourcesPipeline:
                 "batch_fill": 0.0,
                 "tokenize_seconds": 0.0,
                 "inference_seconds": 0.0,
-                "model_forward_seconds": 0.0,
+                "window_tokenize_seconds": 0.0,
+                "model_dispatch_seconds": 0.0,
+                "logits_to_cpu_seconds": 0.0,
+                "reconstruction_seconds": 0.0,
                 "decode_seconds": 0.0,
                 "pipeline_seconds": 0.0,
             }
@@ -627,7 +630,10 @@ class MediaSourcesPipeline:
         overlap_replacements_by_doc = [0 for _tokens in tokens_by_doc]
         model_batches = 0
         model_batch_windows = 0
-        model_forward_seconds = 0.0
+        window_tokenize_seconds = 0.0
+        model_dispatch_seconds = 0.0
+        logits_to_cpu_seconds = 0.0
+        reconstruction_seconds = 0.0
         model_batch_sizes: list[int] = []
 
         def encode_documents(
@@ -635,6 +641,8 @@ class MediaSourcesPipeline:
             token_batches: Sequence[Sequence[str]],
             base_token_indexes: Sequence[int],
         ) -> tuple[Any, list[int], list[int]]:
+            nonlocal window_tokenize_seconds
+            window_tokenize_started = time.perf_counter()
             encoding = self.tokenizer(
                 [list(tokens) for tokens in token_batches],
                 is_split_into_words=True,
@@ -646,6 +654,7 @@ class MediaSourcesPipeline:
                 return_offsets_mapping=False,
                 return_tensors="pt",
             )
+            window_tokenize_seconds += time.perf_counter() - window_tokenize_started
             sample_mapping = encoding.get("overflow_to_sample_mapping")
             if sample_mapping is None:
                 mapped_samples = list(range(len(token_batches)))
@@ -683,9 +692,11 @@ class MediaSourcesPipeline:
             *,
             record_overflow: bool,
         ) -> None:
-            nonlocal model_batches, model_batch_windows, model_forward_seconds
+            nonlocal model_batches, model_batch_windows, model_dispatch_seconds, logits_to_cpu_seconds
+            nonlocal reconstruction_seconds
             chunk_count = len(doc_indexes_by_chunk)
             if record_overflow:
+                reconstruction_started = time.perf_counter()
                 chunks_by_doc: dict[int, list[int]] = {}
                 for chunk_index, doc_index in enumerate(doc_indexes_by_chunk):
                     chunks_by_doc.setdefault(doc_index, []).append(chunk_index)
@@ -712,6 +723,7 @@ class MediaSourcesPipeline:
                             + max(previous_word_ids, default=min(word_ids) - 1)
                         )
                         overlapping_annotation_tokens_by_doc[doc_index] += max(0, previous_last_token - first_token + 1)
+                reconstruction_seconds += time.perf_counter() - reconstruction_started
 
             for batch_start in range(0, chunk_count, batch_size):
                 batch_stop = min(batch_start + batch_size, chunk_count)
@@ -724,9 +736,13 @@ class MediaSourcesPipeline:
                 model_batch_sizes.append(actual_batch_size)
                 model_started = time.perf_counter()
                 outputs = self.model(**model_inputs)
-                model_forward_seconds += time.perf_counter() - model_started
-                log_probabilities = torch.log_softmax(outputs.logits.detach().cpu(), dim=-1)
+                model_dispatch_seconds += time.perf_counter() - model_started
+                logits_to_cpu_started = time.perf_counter()
+                logits = outputs.logits.detach().cpu()
+                log_probabilities = torch.log_softmax(logits, dim=-1)
+                logits_to_cpu_seconds += time.perf_counter() - logits_to_cpu_started
                 attention_mask = model_inputs.get("attention_mask")
+                reconstruction_started = time.perf_counter()
                 attention_values = attention_mask.detach().cpu().tolist() if attention_mask is not None else None
 
                 for local_batch_index, chunk_index in enumerate(range(batch_start, batch_stop)):
@@ -751,6 +767,7 @@ class MediaSourcesPipeline:
                             overlap_replacements_by_doc[doc_index] += 1
                         if existing_log_probs is None or len(token_log_probs) > len(existing_log_probs):
                             word_log_probs[doc_index][absolute_token] = token_log_probs
+                reconstruction_seconds += time.perf_counter() - reconstruction_started
 
         with torch.inference_mode():
             nonempty_doc_indexes = [doc_index for doc_index, tokens in enumerate(tokens_by_doc) if tokens]
@@ -815,7 +832,11 @@ class MediaSourcesPipeline:
             "model_batch_sizes": model_batch_sizes,
             "mean_windows_per_batch": (model_batch_windows / model_batches) if model_batches else 0.0,
             "batch_fill": batch_fill,
-            "model_forward_seconds": model_forward_seconds,
+            "window_tokenize_seconds": window_tokenize_seconds,
+            "model_dispatch_seconds": model_dispatch_seconds,
+            "model_forward_seconds": model_dispatch_seconds,
+            "logits_to_cpu_seconds": logits_to_cpu_seconds,
+            "reconstruction_seconds": reconstruction_seconds,
         }
         return WordLogProbResults(word_log_probs_by_doc=out, diagnostics_by_doc=diagnostics_by_doc, stats=stats)
 
