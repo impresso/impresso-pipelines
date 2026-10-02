@@ -13,6 +13,12 @@ def pipeline():
     return AdClassifierPipeline()
 
 
+@pytest.fixture
+def diagnostics_pipeline():
+    """Create a pipeline that includes diagnostic output fields."""
+    return AdClassifierPipeline(diagnostics=True)
+
+
 class TestAdClassifierPipeline:
     """Test suite for AdClassifierPipeline."""
 
@@ -23,10 +29,10 @@ class TestAdClassifierPipeline:
         assert pipeline.tokenizer is not None
         assert pipeline.device in ["cuda", "mps", "cpu"]
 
-    def test_single_text_classification(self, pipeline):
+    def test_single_text_classification(self, diagnostics_pipeline):
         """Test classification of a single text string."""
         text = "À vendre: Belle villa 5 pièces, CHF 850'000. Tél. 021 123 45 67"
-        result = pipeline(text)
+        result = diagnostics_pipeline(text)
         
         assert isinstance(result, dict)
         assert "type" in result
@@ -101,10 +107,10 @@ class TestAdClassifierPipeline:
         assert isinstance(result, dict)
         assert "type" in result
 
-    def test_output_fields(self, pipeline):
+    def test_output_fields(self, diagnostics_pipeline):
         """Test that all expected output fields are present."""
         text = "À vendre: Belle villa"
-        result = pipeline(text)
+        result = diagnostics_pipeline(text)
         
         expected_fields = [
             "type",
@@ -135,11 +141,11 @@ class TestAdClassifierPipeline:
         for result in results:
             assert "type" in result
 
-    def test_rule_based_features(self, pipeline):
+    def test_rule_based_features(self, diagnostics_pipeline):
         """Test that rule-based features are detected."""
         # Text with clear ad indicators
         text = "À vendre: Villa 5 pièces, 150m², CHF 850'000. Tél. 021 123 45 67, Rue de la Paix 12, 1000 Lausanne"
-        result = pipeline(text)
+        result = diagnostics_pipeline(text)
         
         # Should have high rule score due to multiple indicators
         assert "rule_score" in result
