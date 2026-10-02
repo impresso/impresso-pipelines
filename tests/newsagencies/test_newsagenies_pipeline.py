@@ -1,4 +1,3 @@
-import pytest_lazyfixture
 from impresso_pipelines.newsagencies.newsagencies_pipeline import NewsAgenciesPipeline
 
 
@@ -119,5 +118,3 @@ def test_diagnostics():
     assert isinstance(result['agencies'][0]['start'], int)
     assert 'stop' in result['agencies'][0]
     assert isinstance(result['agencies'][0]['stop'], int)
-    
-    

@@ -405,14 +405,16 @@ def get_bloomfilter(
         >>> "hello" in bf
         True
     """
-    return BloomFilter.open(
-        hf_hub_download(
-            repo_id=model_id,
-            filename=filename,
-            revision=revision,
-            local_files_only=local_files_only,
-        )
+    bloomfilter_path = hf_hub_download(
+        repo_id=model_id,
+        filename=filename,
+        revision=revision,
+        local_files_only=local_files_only,
     )
+
+    # Hugging Face cache files may be read-only, especially in CI. Membership
+    # checks do not modify the filter, so open it explicitly in read-only mode.
+    return BloomFilter.open(bloomfilter_path, mode="r")
 
 
 class OCRQAPipeline:

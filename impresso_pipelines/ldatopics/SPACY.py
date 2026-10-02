@@ -115,6 +115,22 @@ class SPACY:
         
         path_to_model = self.download_and_extract_model(model_url)
         self.nlp = spacy.load(path_to_model, disable=["parser", "ner"])
+        if language == "lb" and self.nlp.vocab.vectors.shape == (0, 0):
+            # The Luxembourgish model was trained without static word vectors,
+            # so its vector table has no rows and no dimensions. Its saved
+            # tok2vec architecture nevertheless contains a StaticVectors layer.
+            #
+            # spaCy 3.8 represents an unknown vector with row index -1 and tries
+            # to read that row even when the vector table is completely empty.
+            # This raises "IndexError: index -1 is out of bounds" before the
+            # tagger can run. Older spaCy versions tolerated the empty lookup.
+            #
+            # Adding one zero-width row gives the missing-vector lookup a valid
+            # row without adding vector values, changing vector dimensions, or
+            # modifying the model's learned weights. This compatibility shim can
+            # be removed when the Luxembourgish model is published with a model
+            # structure that is compatible with spaCy 3.8's vector lookup.
+            self.nlp.vocab.vectors.resize((1, 0))
 
         self.config = model_config or self.load_legacy_config(language, latest_version)
         self.topic_model_id = self.config.get(
