@@ -173,10 +173,10 @@ class LangIdentPipeline:
 
         # Get predictions (k=300 for diagnostics, k=1 for standard)
         k = 300 if diagnostics else 1
-        # The list-input path avoids floret's single-text np.array(..., copy=False),
-        # which raises with NumPy 2 when the probabilities require a copy.
-        all_languages, all_scores = self.model.predict([normalized_text], k=k)
-        languages, scores = all_languages[0], all_scores[0]
+        # Floret's scalar path uses np.array(copy=False), incompatible with
+        # NumPy 2. Its batch API avoids that conversion for the same prediction.
+        batch_languages, batch_scores = self.model.predict([normalized_text], k=k)
+        languages, scores = batch_languages[0], batch_scores[0]
 
         # Round scores to 2 decimal places
         scores = [round(float(score), 2) for score in scores]
