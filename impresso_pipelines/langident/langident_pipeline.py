@@ -173,8 +173,10 @@ class LangIdentPipeline:
 
         # Get predictions (k=300 for diagnostics, k=1 for standard)
         k = 300 if diagnostics else 1
-        output = self.model.predict(normalized_text, k=k)
-        languages, scores = output
+        # The list-input path avoids floret's single-text np.array(..., copy=False),
+        # which raises with NumPy 2 when the probabilities require a copy.
+        all_languages, all_scores = self.model.predict([normalized_text], k=k)
+        languages, scores = all_languages[0], all_scores[0]
 
         # Round scores to 2 decimal places
         scores = [round(score, 2) for score in scores]
