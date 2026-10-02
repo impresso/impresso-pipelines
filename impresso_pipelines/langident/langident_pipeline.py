@@ -179,7 +179,7 @@ class LangIdentPipeline:
         languages, scores = all_languages[0], all_scores[0]
 
         # Round scores to 2 decimal places
-        scores = [round(score, 2) for score in scores]
+        scores = [round(float(score), 2) for score in scores]
 
         top_language = languages[0].replace("__label__", "")
         top_score = scores[0]
