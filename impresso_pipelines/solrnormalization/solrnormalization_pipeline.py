@@ -363,7 +363,7 @@ class SolrNormalizationPipeline:
             termAttr = stream.addAttribute(CharTermAttribute.class_)
             stream.reset()
             while stream.incrementToken():
-                tokens.append(termAttr.toString())
+                tokens.append(str(termAttr.toString()))
             stream.end()
             return tokens
         finally:

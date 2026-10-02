@@ -1,3 +1,4 @@
+import json
 import pytest
 import glob
 import os
@@ -79,3 +80,12 @@ def test_solrnormalization_pipeline_detect_language_fr(shared_pipeline):
     assert "chien" in result['tokens']
     assert "foret" in result['tokens']  # "forêt" gets normalized to "foret" (accent removed)
     assert "prairi" in result['tokens']  # "prairie" gets stemmed to "prairi"
+
+
+def test_normalization_result_is_json_serializable(shared_pipeline):
+    for diagnostics in (False, True):
+        result = shared_pipeline(
+            "Emily Berry and the church", lang="en", diagnostics=diagnostics
+        )
+        assert result["tokens"] == ["emily", "berry", "church"]
+        assert json.loads(json.dumps(result)) == result
