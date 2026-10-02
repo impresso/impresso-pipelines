@@ -7,6 +7,7 @@ and v2 normalization features.
 """
 
 import pytest
+import impresso_pipelines.ocrqa.ocrqa_pipeline as ocrqa_module
 from impresso_pipelines.ocrqa.ocrqa_pipeline import OCRQAPipeline, subtokens
 
 
@@ -37,6 +38,32 @@ SAMPLE_TEXT_LB = (
 def pipeline():
     """Create a fresh OCRQAPipeline instance for each test."""
     return OCRQAPipeline()
+
+
+def test_get_bloomfilter_opens_cached_file_read_only(monkeypatch):
+    """Hugging Face cache files must not require write permission."""
+    downloaded_path = "/cache/model.bloom"
+    opened = []
+    sentinel = object()
+
+    monkeypatch.setattr(
+        ocrqa_module,
+        "hf_hub_download",
+        lambda **kwargs: downloaded_path,
+    )
+
+    class FakeBloomFilter:
+        @staticmethod
+        def open(filename, mode="rw"):
+            opened.append((filename, mode))
+            return sentinel
+
+    monkeypatch.setattr(ocrqa_module, "BloomFilter", FakeBloomFilter)
+
+    result = ocrqa_module.get_bloomfilter("organization/model", "model.bloom")
+
+    assert result is sentinel
+    assert opened == [(downloaded_path, "r")]
 
 
 # German language tests
