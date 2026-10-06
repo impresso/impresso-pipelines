@@ -18,17 +18,17 @@ dependencies = [
 langident = ["huggingface_hub", "floret"]
 ocrqa = ["pybloomfilter3", "huggingface_hub", "floret"]
 ldatopics = ["huggingface_hub", "floret", "jpype1~=1.6", "smart_open~=6.3", "boto3~=1.35", "python-dotenv~=1.0", "spacy>=3.8,<3.9", "jsonschema~=4.23"]
-newsagencies = ["transformers>=5.9,<5.10", "torch>=2.12,<2.13", "torchvision>=0.27,<0.28", "pillow>=12.3.0"]
-mediasources = ["transformers>=5.9,<5.10", "torch>=2.12,<2.13", "huggingface_hub"]
-adclassifier = ["transformers>=5.9,<5.10", "torch>=2.12,<2.13"]
+newsagencies = ["transformers>=5.10.1,<5.11", "torch>=2.13,<2.14", "torchvision>=0.28,<0.29", "pillow>=12.3.0"]
+mediasources = ["transformers>=5.10.1,<5.11", "torch>=2.13,<2.14", "huggingface_hub"]
+adclassifier = ["transformers>=5.10.1,<5.11", "torch>=2.13,<2.14"]
 solrnormalization = ["jpype1~=1.6", "huggingface_hub", "floret", "pysolr"]
-all = ["pybloomfilter3", "huggingface_hub", "floret", "jpype1~=1.6", "smart_open~=6.3", "boto3~=1.35", "python-dotenv~=1.0", "spacy>=3.8,<3.9", "transformers>=5.9,<5.10", "torch>=2.12,<2.13", "jsonschema~=4.23", "torchvision>=0.27,<0.28", "pillow>=12.3.0"]
+all = ["pybloomfilter3", "huggingface_hub", "floret", "jpype1~=1.6", "smart_open~=6.3", "boto3~=1.35", "python-dotenv~=1.0", "spacy>=3.8,<3.9", "transformers>=5.10.1,<5.11", "torch>=2.13,<2.14", "jsonschema~=4.23", "torchvision>=0.28,<0.29", "pillow>=12.3.0"]
 dev = [
     "pybloomfilter3",
     "pytest>=9.0.3",
     "jsonschema~=4.23",
-    "torch>=2.12,<2.13",
-    "transformers>=5.9,<5.10",
+    "torch>=2.13,<2.14",
+    "transformers>=5.10.1,<5.11",
     "flake8~=6.0",
     "mypy~=1.2",
     "pytest-cov~=4.0",
@@ -70,9 +70,9 @@ python-dotenv = { version = "~1.0", optional = true }
 spacy = { version = ">=3.8,<3.9", optional = true }
 jsonschema = { version = "~4.23", optional = true }
 
-transformers = { version = ">=5.9,<5.10", optional = true }
-torch = { version = ">=2.12,<2.13", optional = true }
-torchvision = { version = ">=0.27,<0.28", optional = true }
+transformers = { version = ">=5.10.1,<5.11", optional = true }
+torch = { version = ">=2.13,<2.14", optional = true }
+torchvision = { version = ">=0.28,<0.29", optional = true }
 pillow = { version = ">=12.3.0", optional = true }
 
 [tool.poetry.urls]
@@ -92,8 +92,8 @@ all = ["pybloomfilter3", "huggingface_hub", "floret", "jpype1", "smart_open", "b
 pybloomfilter3 = "*"
 pytest = ">=9.0.3"
 jsonschema = "~4.23"
-torch = ">=2.12,<2.13"
-transformers = ">=5.9,<5.10"
+torch = ">=2.13,<2.14"
+transformers = ">=5.10.1,<5.11"
 flake8 = "~6.0"
 mypy = "~1.2"
 pytest-cov = "~4.0"
