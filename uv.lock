@@ -634,6 +634,7 @@ all = [
     { name = "huggingface-hub" },
     { name = "jpype1" },
     { name = "jsonschema" },
+    { name = "pillow" },
     { name = "pybloomfilter3" },
     { name = "python-dotenv" },
     { name = "smart-open" },
@@ -676,6 +677,7 @@ mediasources = [
     { name = "transformers" },
 ]
 newsagencies = [
+    { name = "pillow" },
     { name = "torch" },
     { name = "torchvision" },
     { name = "transformers" },
@@ -720,6 +722,8 @@ requires-dist = [
     { name = "jsonschema", marker = "extra == 'ldatopics'", specifier = "~=4.23" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "~=1.2" },
     { name = "numpy", specifier = ">=2.4,<2.5" },
+    { name = "pillow", marker = "extra == 'all'", specifier = ">=12.3.0" },
+    { name = "pillow", marker = "extra == 'newsagencies'", specifier = ">=12.3.0" },
     { name = "pybloomfilter3", marker = "extra == 'all'" },
     { name = "pybloomfilter3", marker = "extra == 'dev'" },
     { name = "pybloomfilter3", marker = "extra == 'ocrqa'" },
