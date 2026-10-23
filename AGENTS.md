@@ -17,6 +17,7 @@ impresso_pipelines/       # Main package
   adclassifier/           # Advertisement classifier pipeline
   langident/              # Language identification pipeline
   ldatopics/              # LDA topic modeling pipeline
+  mediasources/           # Media source NER pipeline
   newsagencies/           # News agency extraction pipeline
   ocrqa/                  # OCR quality assessment pipeline
   solrnormalization/      # Lucene/Solr text normalization pipeline
@@ -33,6 +34,7 @@ lucene_jars/              # Lucene JARs for Solr normalization (downloaded via m
 | Language Identification | `langident`         | Detects language of input text with confidence score                 |
 | OCR QA                  | `ocrqa`             | Estimates OCR quality (0–1) using Bloom filters                      |
 | LDA Topics              | `ldatopics`         | Soft clustering via LDA-based topic modeling (requires Java)         |
+| Media Sources           | `mediasources`      | Detects press agencies and radio stations; links them to Wikidata    |
 | News Agencies           | `newsagencies`      | Extracts and ranks news agency entities; links to Wikidata           |
 | Ad Classifier           | `adclassifier`      | Detects advertisements using fine-tuned XLM-RoBERTa                  |
 | Solr Normalization      | `solrnormalization` | Replicates Solr language-specific text normalization (requires Java) |
@@ -75,6 +77,7 @@ Individual modules can be installed independently:
 pip install "impresso-pipelines[langident]"
 pip install "impresso-pipelines[ocrqa]"
 pip install "impresso-pipelines[ldatopics]"
+pip install "impresso-pipelines[mediasources]"
 pip install "impresso-pipelines[newsagencies]"
 pip install "impresso-pipelines[adclassifier]"
 pip install "impresso-pipelines[solrnormalization]"
