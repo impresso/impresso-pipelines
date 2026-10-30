@@ -14,6 +14,7 @@ dependencies = [
     "urllib3>=2.7.0",
     "certifi>=2026.10.18",
     "filelock>=4.2.1",
+    "setuptools>=84.1.0",
 ]
 
 [project.optional-dependencies]
@@ -66,6 +67,7 @@ pysolr = "*"
 urllib3 = ">=2.7.0"
 certifi = ">=2026.10.18"
 filelock = ">=4.2.1"
+setuptools = ">=84.1.0"
 
 jpype1 = { version = "~1.6", optional = true }
 smart_open = { version = "~6.3", optional = true }
