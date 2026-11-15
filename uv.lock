@@ -619,7 +619,7 @@ wheels = [
 
 [[package]]
 name = "impresso-pipelines"
-version = "0.6.1.2"
+version = "0.6.1.3"
 source = { editable = "." }
 dependencies = [
     { name = "certifi" },
@@ -679,7 +679,7 @@ ldatopics = [
     { name = "smart-open" },
     { name = "spacy" },
 ]
-mediasources = [
+mediaagencies = [
     { name = "huggingface-hub" },
     { name = "torch" },
     { name = "transformers" },
@@ -720,7 +720,7 @@ requires-dist = [
     { name = "huggingface-hub", marker = "extra == 'dev'" },
     { name = "huggingface-hub", marker = "extra == 'langident'" },
     { name = "huggingface-hub", marker = "extra == 'ldatopics'" },
-    { name = "huggingface-hub", marker = "extra == 'mediasources'" },
+    { name = "huggingface-hub", marker = "extra == 'mediaagencies'" },
     { name = "huggingface-hub", marker = "extra == 'ocrqa'" },
     { name = "huggingface-hub", marker = "extra == 'solrnormalization'" },
     { name = "jpype1", marker = "extra == 'all'", specifier = "~=1.6" },
@@ -752,18 +752,18 @@ requires-dist = [
     { name = "torch", marker = "extra == 'adclassifier'", specifier = ">=2.13,<2.14" },
     { name = "torch", marker = "extra == 'all'", specifier = ">=2.13,<2.14" },
     { name = "torch", marker = "extra == 'dev'", specifier = ">=2.13,<2.14" },
-    { name = "torch", marker = "extra == 'mediasources'", specifier = ">=2.13,<2.14" },
+    { name = "torch", marker = "extra == 'mediaagencies'", specifier = ">=2.13,<2.14" },
     { name = "torch", marker = "extra == 'newsagencies'", specifier = ">=2.13,<2.14" },
     { name = "torchvision", marker = "extra == 'all'", specifier = ">=0.28,<0.29" },
     { name = "torchvision", marker = "extra == 'newsagencies'", specifier = ">=0.28,<0.29" },
     { name = "transformers", marker = "extra == 'adclassifier'", specifier = ">=5.10.1,<5.11" },
     { name = "transformers", marker = "extra == 'all'", specifier = ">=5.10.1,<5.11" },
     { name = "transformers", marker = "extra == 'dev'", specifier = ">=5.10.1,<5.11" },
-    { name = "transformers", marker = "extra == 'mediasources'", specifier = ">=5.10.1,<5.11" },
+    { name = "transformers", marker = "extra == 'mediaagencies'", specifier = ">=5.10.1,<5.11" },
     { name = "transformers", marker = "extra == 'newsagencies'", specifier = ">=5.10.1,<5.11" },
     { name = "urllib3", specifier = ">=2.7.0" },
 ]
-provides-extras = ["langident", "ocrqa", "ldatopics", "newsagencies", "mediasources", "adclassifier", "solrnormalization", "all", "dev"]
+provides-extras = ["langident", "ocrqa", "ldatopics", "newsagencies", "mediaagencies", "adclassifier", "solrnormalization", "all", "dev"]
 
 [[package]]
 name = "iniconfig"

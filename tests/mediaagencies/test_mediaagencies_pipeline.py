@@ -6,10 +6,10 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from impresso_pipelines.mediasources import mediasources_pipeline as mediasources_module
-from impresso_pipelines.mediasources.config import LABEL_START_YEARS, LABEL_WKDATA_QIDS
-from impresso_pipelines.mediasources.mediasources_pipeline import (
-    MediaSourcesPipeline,
+from impresso_pipelines.mediaagencies import mediaagencies_pipeline as mediaagencies_module
+from impresso_pipelines.mediaagencies.config import LABEL_START_YEARS, LABEL_WKDATA_QIDS
+from impresso_pipelines.mediaagencies.mediaagencies_pipeline import (
+    MediaAgenciesPipeline,
     load_tokenizer,
     tokenize_with_offsets,
     torch_dtype,
@@ -246,8 +246,8 @@ def make_pipeline(
     label_by_token: dict[str, int],
     logits_by_token: dict[str, list[float]] | None = None,
     **kwargs,
-) -> MediaSourcesPipeline:
-    return MediaSourcesPipeline(FakeModel(), tokenizer=FakeTokenizer(label_by_token, logits_by_token), device=-1, **kwargs)
+) -> MediaAgenciesPipeline:
+    return MediaAgenciesPipeline(FakeModel(), tokenizer=FakeTokenizer(label_by_token, logits_by_token), device=-1, **kwargs)
 
 
 def test_tokenizer_matches_model_protocol() -> None:
@@ -260,11 +260,11 @@ def test_tokenizer_matches_model_protocol() -> None:
     ] == tokens
 
 
-def test_media_source_qid_and_start_year_mappings_have_same_labels() -> None:
+def test_media_agency_qid_and_start_year_mappings_have_same_labels() -> None:
     assert set(LABEL_START_YEARS) == set(LABEL_WKDATA_QIDS)
 
 
-def test_all_media_source_labels_have_start_years() -> None:
+def test_all_media_agency_labels_have_start_years() -> None:
     assert {label for label, year in LABEL_START_YEARS.items() if year is None} == set()
 
 
@@ -272,8 +272,8 @@ def test_missing_qids_are_explicitly_tracked() -> None:
     assert {label for label, qid in LABEL_WKDATA_QIDS.items() if qid is None} == EXPECTED_MISSING_QIDS
 
 
-def test_media_sources_pipeline_is_separate_from_legacy_newsagencies_pipeline() -> None:
-    assert MediaSourcesPipeline is not NewsAgenciesPipeline
+def test_media_agencies_pipeline_is_separate_from_legacy_newsagencies_pipeline() -> None:
+    assert MediaAgenciesPipeline is not NewsAgenciesPipeline
 
 
 def test_diagnostics_return_decoded_entities_with_exact_offsets() -> None:
@@ -389,7 +389,7 @@ def test_default_stride_is_48_subtokens() -> None:
 
 def test_long_input_uses_first_covering_tokenizer_chunk_for_overlaps() -> None:
     tokenizer = OverflowTokenizer({"Reuters": 1})
-    pipe = MediaSourcesPipeline(
+    pipe = MediaAgenciesPipeline(
         FakeModel(),
         tokenizer=tokenizer,
         device=-1,
@@ -407,7 +407,7 @@ def test_long_input_uses_first_covering_tokenizer_chunk_for_overlaps() -> None:
 
 def test_truncated_window_tail_tokens_are_retried_as_singletons() -> None:
     tokenizer = TruncatingTokenizer({"49": 1}, covered_tokens=3)
-    pipe = MediaSourcesPipeline(
+    pipe = MediaAgenciesPipeline(
         FakeModel(),
         tokenizer=tokenizer,
         device=-1,
@@ -431,7 +431,7 @@ def test_truncated_window_tail_tokens_are_retried_as_singletons() -> None:
 
 def test_tokenizer_native_overflow_uses_subtoken_stride_without_rescue() -> None:
     tokenizer = OverflowTokenizer({"ee": 1})
-    pipe = MediaSourcesPipeline(
+    pipe = MediaAgenciesPipeline(
         FakeModel(),
         tokenizer=tokenizer,
         device=-1,
@@ -458,7 +458,7 @@ def test_tokenizer_native_overflow_uses_subtoken_stride_without_rescue() -> None
 
 def test_tokenizer_native_overflow_reconstructs_multiple_documents() -> None:
     tokenizer = OverflowTokenizer({"aa": 1, "gg": 3, "jj": 1})
-    pipe = MediaSourcesPipeline(
+    pipe = MediaAgenciesPipeline(
         FakeModel(),
         tokenizer=tokenizer,
         device=-1,
@@ -493,7 +493,7 @@ def test_tokenizer_native_overflow_reconstructs_multiple_documents() -> None:
 
 
 def test_later_overlap_replaces_partial_word_representation() -> None:
-    pipe = MediaSourcesPipeline(
+    pipe = MediaAgenciesPipeline(
         FakeModel(),
         tokenizer=PartialBoundaryTokenizer({}),
         device=-1,
@@ -505,7 +505,7 @@ def test_later_overlap_replaces_partial_word_representation() -> None:
 
 
 def test_later_overlap_replaces_partial_word_label() -> None:
-    pipe = MediaSourcesPipeline(
+    pipe = MediaAgenciesPipeline(
         FakeModel(),
         tokenizer=PartialBoundaryTokenizer({}),
         device=-1,
@@ -518,7 +518,7 @@ def test_later_overlap_replaces_partial_word_label() -> None:
 
 
 def test_equal_length_overlap_keeps_first_representation() -> None:
-    pipe = MediaSourcesPipeline(
+    pipe = MediaAgenciesPipeline(
         FakeModel(),
         tokenizer=EqualBoundaryTokenizer({}),
         device=-1,
@@ -532,7 +532,7 @@ def test_equal_length_overlap_keeps_first_representation() -> None:
 
 def test_singleton_rescue_failure_still_raises_clear_error() -> None:
     tokenizer = TruncatingTokenizer({}, covered_tokens=0)
-    pipe = MediaSourcesPipeline(
+    pipe = MediaAgenciesPipeline(
         FakeModel(),
         tokenizer=tokenizer,
         device=-1,
@@ -550,7 +550,7 @@ def test_singleton_rescue_failure_still_raises_clear_error() -> None:
 def test_predict_many_batches_windows_across_documents() -> None:
     model = FakeModel()
     tokenizer = FakeTokenizer({"Reuters": 1, "BBC": 3})
-    pipe = MediaSourcesPipeline(model, tokenizer=tokenizer, device=-1, batch_size=2)
+    pipe = MediaAgenciesPipeline(model, tokenizer=tokenizer, device=-1, batch_size=2)
 
     results = pipe(["Reuters said.", "BBC said.", "No source."])
 
@@ -564,11 +564,11 @@ def test_predict_many_batches_windows_across_documents() -> None:
 def test_predict_many_logs_entity_statistics(caplog) -> None:
     pipe = make_pipeline({"Reuters": 1, "BBC": 3})
 
-    with caplog.at_level(logging.INFO, logger=mediasources_module.__name__):
+    with caplog.at_level(logging.INFO, logger=mediaagencies_module.__name__):
         pipe(["Reuters said.", "BBC said.", "No source."])
 
     assert (
-        "MediaSources entities: documents=3, documents_with_entities=2, entities=2, "
+        "MediaAgencies entities: documents=3, documents_with_entities=2, entities=2, "
         "labels=org.ent.pressagency.reuters=1, org.ent.radiostation.bbc=1"
     ) in caplog.text
 
@@ -611,16 +611,16 @@ def test_pipeline_rejects_incompatible_model_metadata() -> None:
     model.config.annotation_tokenization = "legacy"
 
     with pytest.raises(ValueError, match="unsupported annotation tokenization"):
-        MediaSourcesPipeline(model, tokenizer=FakeTokenizer({}), device=-1)
+        MediaAgenciesPipeline(model, tokenizer=FakeTokenizer({}), device=-1)
 
 
 def test_pipeline_requires_tokenizer_for_instantiated_model() -> None:
     with pytest.raises(ValueError, match="tokenizer must be provided"):
-        MediaSourcesPipeline(FakeModel(), device=-1)
+        MediaAgenciesPipeline(FakeModel(), device=-1)
 
 
 def test_pipeline_drops_token_type_ids_for_modernbert_forward_signature() -> None:
-    pipe = MediaSourcesPipeline(
+    pipe = MediaAgenciesPipeline(
         FakeModernBertModel(),
         tokenizer=TokenTypeIdsTokenizer({"Reuters": 1}),
         device=-1,
@@ -639,7 +639,7 @@ def test_unlinked_known_entity_gets_null_wkdata_qid() -> None:
     }
     model = FakeModel(id2label=id2label)
     tokenizer = FakeTokenizer({"Agence": 1, "Radio": 2})
-    pipe = MediaSourcesPipeline(model, tokenizer=tokenizer, device=-1)
+    pipe = MediaAgenciesPipeline(model, tokenizer=tokenizer, device=-1)
 
     result = pipe("Agence Radio")
 
@@ -663,10 +663,10 @@ def test_pipeline_passes_requested_dtype_to_model_loader(monkeypatch) -> None:
         calls.append(kwargs)
         return FakeModel()
 
-    monkeypatch.setattr(mediasources_module.AutoModelForTokenClassification, "from_pretrained", fake_model_from_pretrained)
-    monkeypatch.setattr(mediasources_module, "load_tokenizer", lambda *_args, **_kwargs: FakeTokenizer({}))
+    monkeypatch.setattr(mediaagencies_module.AutoModelForTokenClassification, "from_pretrained", fake_model_from_pretrained)
+    monkeypatch.setattr(mediaagencies_module, "load_tokenizer", lambda *_args, **_kwargs: FakeTokenizer({}))
 
-    MediaSourcesPipeline("model-id", revision="v2.0.0", dtype="float16", device=-1)
+    MediaAgenciesPipeline("model-id", revision="v2.0.0", dtype="float16", device=-1)
 
     assert calls[0]["dtype"] is torch.float16
 
@@ -700,9 +700,9 @@ def test_load_tokenizer_falls_back_for_tokenizers_backend_config(monkeypatch, tm
         def __init__(self, **kwargs):
             self.kwargs = kwargs
 
-    monkeypatch.setattr(mediasources_module.AutoTokenizer, "from_pretrained", fake_auto_from_pretrained)
-    monkeypatch.setattr(mediasources_module, "hf_hub_download", fake_hf_hub_download)
-    monkeypatch.setattr(mediasources_module, "PreTrainedTokenizerFast", FakePreTrainedTokenizerFast)
+    monkeypatch.setattr(mediaagencies_module.AutoTokenizer, "from_pretrained", fake_auto_from_pretrained)
+    monkeypatch.setattr(mediaagencies_module, "hf_hub_download", fake_hf_hub_download)
+    monkeypatch.setattr(mediaagencies_module, "PreTrainedTokenizerFast", FakePreTrainedTokenizerFast)
 
     tokenizer = load_tokenizer("model-id", revision="v2.0.0", local_files_only=True, trust_remote_code=True)
 

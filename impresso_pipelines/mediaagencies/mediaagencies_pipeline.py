@@ -240,8 +240,8 @@ def bio_labels_to_entities(
     return entities
 
 
-class MediaSourcesPipeline:
-    """Pipeline for joint Impresso media-source NER."""
+class MediaAgenciesPipeline:
+    """Pipeline for joint Impresso media-agency NER."""
 
     def __init__(
         self,
@@ -521,7 +521,7 @@ class MediaSourcesPipeline:
         else:
             labels = "none"
         logger.info(
-            "MediaSources entities: documents=%d, documents_with_entities=%d, entities=%d, labels=%s",
+            "MediaAgencies entities: documents=%d, documents_with_entities=%d, entities=%d, labels=%s",
             len(results),
             documents_with_entities,
             entity_total,
