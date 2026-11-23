@@ -4,7 +4,7 @@ import random
 
 import pytest
 
-from impresso_pipelines.mediasources.decoding import (
+from impresso_pipelines.mediaagencies.decoding import (
     compile_bio_schema,
     decode_bio_viterbi_reference,
     first_subtoken_emissions,

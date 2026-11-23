@@ -27,7 +27,7 @@ from .config import LABEL_START_YEARS, LABEL_WKDATA_QIDS
 logger = logging.getLogger(__name__)
 
 
-DEFAULT_MODEL = "impresso-project/mmbert-impresso-mediasources-ner"
+DEFAULT_MODEL = "impresso-project/mmbert-impresso-mediaagencies-ner"
 DEFAULT_REVISION = "v2.0.0"
 TOKENIZATION_PROFILE = "unicode-word-punctuation-v1"
 DEFAULT_MAX_SEQUENCE_LEN = 512
@@ -240,7 +240,7 @@ def bio_labels_to_entities(
     return entities
 
 
-class MediaSourcesPipeline:
+class MediaAgenciesPipeline:
     """Pipeline for joint Impresso media-source NER."""
 
     def __init__(
@@ -531,7 +531,7 @@ class MediaSourcesPipeline:
         else:
             labels = "none"
         logger.info(
-            "MediaSources entities: documents=%d, documents_with_entities=%d, entities=%d, labels=%s",
+            "MediaAgencies entities: documents=%d, documents_with_entities=%d, entities=%d, labels=%s",
             len(results),
             documents_with_entities,
             entity_total,

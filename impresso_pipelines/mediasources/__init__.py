@@ -1,17 +1,14 @@
-"""
-Joint media-source named entity recognition for Impresso text.
+"""Deprecated alias for :mod:`impresso_pipelines.mediaagencies`."""
 
-Provides a model-protocol-aware pipeline for press agencies, radio stations,
-and future media-source classes without changing the legacy news-agency API.
-"""
+import warnings
 
-try:
-    import torch  # noqa: F401
-    import transformers  # noqa: F401
+from impresso_pipelines.mediaagencies import *  # noqa: F401,F403
+from impresso_pipelines.mediaagencies import MediaAgenciesPipeline
 
-    from .mediasources_pipeline import MediaSourcesPipeline
-except ImportError as exc:
-    raise ImportError(
-        "The mediasources subpackage requires additional dependencies. "
-        "Please install them with: pip install 'impresso-pipelines[mediasources]'"
-    ) from exc
+MediaSourcesPipeline = MediaAgenciesPipeline
+
+warnings.warn(
+    "impresso_pipelines.mediasources is deprecated; use impresso_pipelines.mediaagencies",
+    DeprecationWarning,
+    stacklevel=2,
+)
