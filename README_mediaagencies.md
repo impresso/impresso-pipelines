@@ -152,8 +152,8 @@ Aggregate timing and batching statistics from the most recent call are available
 
 ```python
 pipeline = MediaAgenciesPipeline(
-    model="impresso-project/mmbert-impresso-mediasources-ner",
-    revision="v2.0.0",
+    model="impresso-project/mmbert-impresso-mediaagencies-ner",
+    revision="v2.1.0",            # available: "v2.1.0" (default), "v2.0.1", "v2.0.0"
     min_score=None,
     batch_size=8,
     dtype="float32",             # float32, float16, or bfloat16
