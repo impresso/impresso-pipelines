@@ -9,7 +9,7 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from huggingface_hub import hf_hub_download
 from transformers import AutoModelForTokenClassification, AutoTokenizer, PreTrainedTokenizerFast
@@ -27,8 +27,8 @@ from .config import LABEL_START_YEARS, LABEL_WKDATA_QIDS
 logger = logging.getLogger(__name__)
 
 
-DEFAULT_MODEL = "impresso-project/mmbert-impresso-mediasources-ner"
-DEFAULT_REVISION = "v2.0.0"
+DEFAULT_MODEL = "impresso-project/mmbert-impresso-mediaagencies-ner"
+DEFAULT_REVISION = "v2.1.0"
 TOKENIZATION_PROFILE = "unicode-word-punctuation-v1"
 DEFAULT_MAX_SEQUENCE_LEN = 512
 DEFAULT_MAX_ANNOTATION_TOKENS = 256
@@ -109,7 +109,7 @@ def publication_year(publication_date: str | int | None) -> int | None:
 def load_tokenizer(
     model: str,
     *,
-    revision: str | None,
+    revision: Literal["v2.1.0", "v2.0.1", "v2.0.0"] | str | None,
     local_files_only: bool,
     trust_remote_code: bool,
 ) -> Any:
@@ -240,14 +240,14 @@ def bio_labels_to_entities(
     return entities
 
 
-class MediaSourcesPipeline:
-    """Pipeline for joint Impresso media-source NER."""
+class MediaAgenciesPipeline:
+    """Pipeline for joint Impresso media-agency NER."""
 
     def __init__(
         self,
         model: str | Any = DEFAULT_MODEL,
         *,
-        revision: str | None = DEFAULT_REVISION,
+        revision: Literal["v2.1.0", "v2.0.1", "v2.0.0"] | str | None = DEFAULT_REVISION,
         tokenizer: Any | None = None,
         decoder: str | None = None,
         min_score: float | None = None,
@@ -261,6 +261,13 @@ class MediaSourcesPipeline:
         local_files_only: bool = False,
         trust_remote_code: bool = True,
     ) -> None:
+        """
+        Args:
+            model: Hugging Face repo ID or an instantiated model.
+            revision: Model version (Hugging Face tag) of the default model.
+                Available: "v2.1.0" (default), "v2.0.1", "v2.0.0".
+                Any other branch/tag/commit, or None for "main", is also accepted.
+        """
         self.model_id = model if isinstance(model, str) else None
         self.revision = revision
         self.default_min_score = min_score
@@ -521,7 +528,7 @@ class MediaSourcesPipeline:
         else:
             labels = "none"
         logger.info(
-            "MediaSources entities: documents=%d, documents_with_entities=%d, entities=%d, labels=%s",
+            "MediaAgencies entities: documents=%d, documents_with_entities=%d, entities=%d, labels=%s",
             len(results),
             documents_with_entities,
             entity_total,

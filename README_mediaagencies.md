@@ -1,13 +1,13 @@
-# Media Sources Pipeline
+# Media Agencies Pipeline
 
-This pipeline identifies media-source mentions in historical newspaper text. It currently recognizes press agencies and radio stations, returns exact character offsets, and links known entities to Wikidata.
+This pipeline identifies media-agency mentions in historical newspaper text. It currently recognizes press agencies and radio stations, returns exact character offsets, and links known entities to Wikidata.
 
-The pipeline is separate from the legacy `NewsAgenciesPipeline`. It uses a joint named entity recognition model and supports additional media-source classes, long-document chunking, batched inference, and optional date-aware filtering.
+The pipeline is separate from the legacy `NewsAgenciesPipeline`. It uses a joint named entity recognition model and supports additional media-agency classes, long-document chunking, batched inference, and optional date-aware filtering.
 
 ## Installation
 
 ```bash
-pip install "impresso-pipelines[mediasources]"
+pip install "impresso-pipelines[mediaagencies]"
 ```
 
 The model is downloaded from Hugging Face on first use and cached locally.
@@ -15,9 +15,9 @@ The model is downloaded from Hugging Face on first use and cached locally.
 ## Quick Start
 
 ```python
-from impresso_pipelines.mediasources import MediaSourcesPipeline
+from impresso_pipelines.mediaagencies import MediaAgenciesPipeline
 
-pipeline = MediaSourcesPipeline()
+pipeline = MediaAgenciesPipeline()
 
 text = "Reuters reported the decision, while the BBC World Service provided updates."
 result = pipeline(text)
@@ -77,7 +77,7 @@ result = pipeline("Reuters reported from London.")
 results = pipeline([
     "Reuters reported from London.",
     "The BBC World Service provided an update.",
-    "No media source is mentioned here.",
+    "No media agency is mentioned here.",
 ])
 ```
 
@@ -105,7 +105,7 @@ Some known labels do not yet have a Wikidata mapping. Their `wkdata_qid` is `Non
 Use `min_score` to remove low-confidence entities after sequence decoding:
 
 ```python
-pipeline = MediaSourcesPipeline(min_score=0.80)
+pipeline = MediaAgenciesPipeline(min_score=0.80)
 
 # Override the default for one call
 result = pipeline(text, min_score=0.90)
@@ -113,7 +113,7 @@ result = pipeline(text, min_score=0.90)
 
 ## Date-Aware Filtering
 
-Each known media source has a start year. When `filter_anachronistic=True` and a publication date is supplied, entities founded after the document year are removed:
+Each known media agency has a start year. When `filter_anachronistic=True` and a publication date is supplied, entities founded after the document year are removed:
 
 ```python
 result = pipeline(
@@ -151,9 +151,9 @@ Aggregate timing and batching statistics from the most recent call are available
 ## Configuration
 
 ```python
-pipeline = MediaSourcesPipeline(
-    model="impresso-project/mmbert-impresso-mediasources-ner",
-    revision="v2.0.0",
+pipeline = MediaAgenciesPipeline(
+    model="impresso-project/mmbert-impresso-mediaagencies-ner",
+    revision="v2.1.0",            # available: "v2.1.0" (default), "v2.0.1", "v2.0.0"
     min_score=None,
     batch_size=8,
     dtype="float32",             # float32, float16, or bfloat16
@@ -174,7 +174,7 @@ Model protocol settings are read from the model metadata. Override tokenization 
 Batching combines model windows from multiple documents, which is more efficient on accelerators:
 
 ```python
-pipeline = MediaSourcesPipeline(batch_size=16, device="cuda:0")
+pipeline = MediaAgenciesPipeline(batch_size=16, device="cuda:0")
 results = pipeline(list_of_texts)
 
 print(pipeline.last_inference_stats)
@@ -187,7 +187,7 @@ Long texts are split into smaller overlapping sections for processing. The resul
 After the model has been cached, prevent network access with:
 
 ```python
-pipeline = MediaSourcesPipeline(local_files_only=True)
+pipeline = MediaAgenciesPipeline(local_files_only=True)
 ```
 
 By default, Hugging Face stores downloaded model files under `~/.cache/huggingface/hub/`.
